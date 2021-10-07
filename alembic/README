@@ -1,0 +1,11 @@
+alembic
+
+полезное:
+https://www.youtube.com/watch?v=KFj3VhMTAdk
+https://github.com/alvassin/alembic-quickstart - репо к ролику выше
+https://github.com/bfaivre/alembic-sqlalchemy-demo  - демо по настройке отсюда
+
+https://stackoverflow.com/questions/12906351/importerror-no-module-named-psycopg2 - когда ругается на ругается на psycopg2
+
+ключевые места в коде помечены:
+#<----alembic
