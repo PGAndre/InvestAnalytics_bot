@@ -20,8 +20,8 @@ async def test_dbquery(bot):
         print(type(prediction.analytic))
         pprint.pprint(prediction.analytic.__dict__)
     # return predicts
-
-    await bot.send_message(chat_id='@Pryakhin_test_channel',
+    channel_id=config.tg_bot.channel_id
+    await bot.send_message(chat_id=channel_id,
                                    text=f'Test scheduler')
 
 #asyncio.run(test_dbquery())

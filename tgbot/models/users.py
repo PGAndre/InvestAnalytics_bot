@@ -21,6 +21,7 @@ class User(Base):
     subscription_until= Column(DateTime, default=datetime.datetime.utcnow)
     created_date = Column(DateTime, default=datetime.datetime.utcnow)
     updated_date = Column(DateTime(timezone=True), onupdate=func.now())
+    is_member = Column(Boolean, default=True)
 
 
     @classmethod
