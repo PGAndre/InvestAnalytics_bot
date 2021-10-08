@@ -6,6 +6,7 @@ from datetime import datetime, timedelta
 from aiogram.dispatcher import FSMContext
 from aiogram.types import Message, ReplyKeyboardRemove
 from aiogram.utils.markdown import hcode
+from sqlalchemy import MetaData
 
 from tgbot.models.analytic import Prediction, Analytic
 from tgbot.keyboards import reply
@@ -168,6 +169,7 @@ async def confirm(message: Message, state: FSMContext):
 
 
 async def publish(message: Message, state: FSMContext):
+    config = message.bot.get('config')
     async with state.proxy() as data:
         ticker = data['ticker']
         name = data['name']
@@ -190,7 +192,8 @@ async def publish(message: Message, state: FSMContext):
     print(prediction.__dict__)
     await message.answer(f'Акця {ticker}, new target {target} через {predict_time} дней',
                          reply_markup=ReplyKeyboardRemove())
-    await message.bot.send_message(chat_id='@Pryakhin_test_channel',
+    channel_id=config.tg_bot.channel_id
+    await message.bot.send_message(chat_id=channel_id,
                                    text=f'Акця ${ticker} ({name}), {start_value} {currency} -----> {target} {currency} через {predict_time} дней.')
     await state.finish()
 

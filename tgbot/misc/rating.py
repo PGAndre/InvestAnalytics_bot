@@ -155,8 +155,8 @@ async def predictions_active_finished():
             text = f'''Прогноз по акции {updated_prediction.ticker}  не сбылся . 
                     Рейтинг Прогноза {updated_prediction.rating}
                     Рейтинг аналитика {analytic.Nickname}: {analytic.rating} -----> {updated_analytic.rating} .'''
-
-        await bot.send_message(chat_id='@Pryakhin_test_channel',
+        channel_id=config.tg_bot.channel_id
+        await bot.send_message(chat_id=channel_id,
                                text=text)
 
 

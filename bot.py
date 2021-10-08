@@ -1,21 +1,19 @@
 import asyncio
 import logging
 
-from aiogram import Bot, Dispatcher
+from aiogram import Bot
 from aiogram.contrib.fsm_storage.memory import MemoryStorage
 from aiogram.contrib.fsm_storage.redis import RedisStorage
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
-from tgbot.misc.rating import calculate_rating_job
-from tgbot.models import scheduled
 from tgbot.config import load_config
-from tgbot.filters.analytic import *
 from tgbot.filters.admin import AdminFilter
-from tgbot.handlers.analytic import *
+from tgbot.filters.analytic import *
 from tgbot.handlers.admin import register_admin
-from tgbot.handlers.echo import register_echo
+from tgbot.handlers.analytic import *
 from tgbot.handlers.user import register_user
 from tgbot.middlewares.db import DbMiddleware
+from tgbot.misc.rating import calculate_rating_job
 from tgbot.services.database import create_db_session
 
 logger = logging.getLogger(__name__)
@@ -67,7 +65,7 @@ async def main():
     scheduler.start()
     # start r4566
     try:
-        await dp.start_polling()
+        await dp.start_polling(allowed_updates=["message", "chat_member"])
     finally:
         await dp.storage.close()
         await dp.storage.wait_closed()

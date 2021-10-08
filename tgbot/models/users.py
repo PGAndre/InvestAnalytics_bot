@@ -2,7 +2,7 @@ import asyncio
 from contextlib import suppress
 import datetime
 
-from sqlalchemy import Column, BigInteger, insert, String, ForeignKey, update, func, Boolean, DateTime
+from sqlalchemy import Column, BigInteger, insert, String, ForeignKey, update, func, Boolean, DateTime, MetaData
 from sqlalchemy import select
 from sqlalchemy.orm import sessionmaker
 
@@ -12,16 +12,16 @@ from tgbot.services.db_base import Base
 
 
 class User(Base):
-    __tablename__ = "telegram_users"
+    __tablename__ = "Users"
     telegram_id = Column(BigInteger, primary_key=True)
     first_name = Column(String(length=100))
     last_name = Column(String(length=100), nullable=True)
     username = Column(String(length=100), nullable=True)
     role = Column(String(length=100), default='user')
-    subscription_until= Column(DateTime, default=datetime.datetime.utcnow)
+    subscription_until = Column(DateTime, default=datetime.datetime.utcnow)
     created_date = Column(DateTime, default=datetime.datetime.utcnow)
-    updated_date = Column(DateTime(timezone=True), onupdate=func.now())
-
+    updated_date = Column(DateTime, onupdate=func.now())
+    is_member = Column(Boolean, default=True)
 
     @classmethod
     async def get_user(cls, db_session: sessionmaker, telegram_id: int) -> 'User':
@@ -34,32 +34,30 @@ class User(Base):
     @classmethod
     async def add_user(cls,
                        db_session: sessionmaker,
+                       subscription_until: datetime,
                        telegram_id: int,
-                       first_name: str,
+                       first_name: str = None,
                        last_name: str = None,
                        username: str = None,
-                       lang_code: str = None,
-                       role: str = None
+                       **optional_fields: dict,
                        ) -> 'User':
         async with db_session() as db_session:
-            sql = insert(cls).values(telegram_id=telegram_id,
+            sql = insert(cls).values(subscription_until=subscription_until,
+                                     telegram_id=telegram_id,
                                      first_name=first_name,
                                      last_name=last_name,
                                      username=username,
-                                     lang_code=lang_code,
-                                     role=role).returning('*')
+                                     **optional_fields).returning('*')
             result = await db_session.execute(sql)
             await db_session.commit()
             return result.first()
 
-    async def update_user(self, db_session: sessionmaker, updated_fields: dict) -> 'User':
+    async def update_user(self, db_session: sessionmaker, **updated_fields: dict) -> 'User':
         async with db_session() as db_session:
-            sql = update(User).where(User.telegram_id == self.telegram_id).values(**updated_fields)
+            sql = update(User).where(User.telegram_id == self.telegram_id).values(**updated_fields).returning('*')
             result = await db_session.execute(sql)
             await db_session.commit()
-            return result
-
-
+            return result.first()
 
 
 if __name__ == '__main__':

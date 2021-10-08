@@ -1,14 +1,20 @@
 from logging.config import fileConfig
 import os
 import sys
-from sqlalchemy import engine_from_config
+
+from tgbot.models.analytic import Prediction
+from tgbot.services.db_base import Base
+from sqlalchemy import engine_from_config, MetaData
 from sqlalchemy import pool
-from tgbot.models import analytic #<----alembic
+from tgbot.models.analytic import Analytic, Prediction
+from tgbot.models.users import User
 from alembic import context
 from tgbot.config import load_config, Config
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
+#from tgbot.models.analytic import Prediction
+
 config = context.config
 
 
@@ -39,8 +45,10 @@ fileConfig(config.config_file_name)
 # target_metadata = mymodel.Base.metadata
 #target_metadata = None
 
+target_metadata = Base.metadata
+
 #sys.path.append(os.getcwd())
-target_metadata = [analytic.Base.metadata] #<----alembic
+#target_metadata = [analytic.Base.metadata, users.Base.metadata] #<----alembic
 
 # other values from the config, defined by the needs of env.py,
 # can be acquired:

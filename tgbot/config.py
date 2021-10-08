@@ -17,6 +17,7 @@ class TgBot:
     admin_ids: int
     analytic_ids: list[int]
     use_redis: bool
+    channel_id: int
 
 
 @dataclass
@@ -41,6 +42,7 @@ def load_config(path: str = None):
             admin_ids=env.list("ADMINS"),
             analytic_ids=list(map(int, env.list("ANALYTICS"))),
             use_redis=env.bool("USE_REDIS"),
+            channel_id=env.int("CHANNEL_ID")
         ),
         db=DbConfig(
             host=env.str('DB_HOST'),
