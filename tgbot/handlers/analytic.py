@@ -6,6 +6,7 @@ from datetime import datetime, timedelta
 from aiogram.dispatcher import FSMContext
 from aiogram.types import Message, ReplyKeyboardRemove
 from aiogram.utils.markdown import hcode
+from sqlalchemy import MetaData
 
 from tgbot.models.analytic import Prediction, Analytic
 from tgbot.keyboards import reply

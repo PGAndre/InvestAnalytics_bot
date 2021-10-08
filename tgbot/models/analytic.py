@@ -6,7 +6,7 @@ from contextlib import suppress
 from decimal import Decimal
 
 from sqlalchemy import Column, BigInteger, Integer, insert, String, ForeignKey, update, func, DateTime, Sequence, \
-    Numeric, Boolean, true
+    Numeric, Boolean, true, MetaData
 from sqlalchemy import select
 from sqlalchemy.orm import sessionmaker, relationship
 
@@ -226,6 +226,8 @@ class Prediction(Base):
         print(math.pow(min(abs(profit), predicted_profit)/predicted_profit, 1/3))
         print(f'RATING: {rating_rounded}')
         return rating_rounded
+
+
 
         #E = (1 + sign(r) * power((D - d) / (D - 1), 1 / 3) * power(p / P, 1 / 3) * power(min( | r |, p) / p, 1 / 3)) / 2
 
