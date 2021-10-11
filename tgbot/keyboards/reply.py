@@ -30,3 +30,12 @@ confirm = ReplyKeyboardMarkup(
     ],
     resize_keyboard=True
 )
+
+cancel = ReplyKeyboardMarkup(
+    keyboard=[
+        [
+            KeyboardButton(text="отменить")
+        ]
+    ],
+    resize_keyboard=True
+)

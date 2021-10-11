@@ -3,8 +3,8 @@ from aiogram.types import Message
 
 
 async def admin_start(message: Message):
-    await message.reply("Hello, admin!")
+    await message.answer("Hello, admin!")
 
 
 def register_admin(dp: Dispatcher):
-    dp.register_message_handler(admin_start, commands=["start"], state="*", is_admin=True) #is_admin  - это фильтр? можно сколько угодно фишльтров?
+    dp.register_message_handler(admin_start, commands=["start"], state="*", is_admin=True)

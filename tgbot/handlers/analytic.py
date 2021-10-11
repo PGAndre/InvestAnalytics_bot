@@ -15,7 +15,7 @@ from tgbot.misc import tinkoff
 
 
 async def make_predict(message: Message):
-    await message.answer("Введите название акции!", reply_markup=ReplyKeyboardRemove())
+    await message.answer("Введите название акции!", reply_markup=reply.cancel)
     print(message.text, message.from_user.username, message.from_user.id)
     await Predict.Check_Ticker.set()
 
@@ -157,14 +157,19 @@ async def confirm(message: Message, state: FSMContext):
 
 
     # await message.answer(message)
+    db_session = message.bot.get('db')
+    analytic: Analytic = await Analytic.get_analytic_by_id(db_session=db_session, telegram_id=message.from_user.id)
     async with state.proxy() as data:
         data['target'] = target
+        data['analytic_nickname'] = analytic.Nickname
+        data['analytic_rating'] = analytic.rating
     ticker = data['ticker']
     predict_time = data['predict_time']
     target = data['target']
     name = data['name']
     currency = data['currency']
-    await message.answer(f'Акця ${ticker} ({name}), {start_value} {currency} -----> {target} {currency} через {predict_time} дней. ', reply_markup=reply.confirm)
+    await message.answer(f'Акця ${ticker} ({name}), {start_value} {currency} -----> {target} {currency} через {predict_time} дней.\n'
+                         f'Аналитик: {analytic.Nickname}, rating: {analytic.rating}', reply_markup=reply.confirm)
     await Predict.Publish.set()
 
 
@@ -178,6 +183,8 @@ async def publish(message: Message, state: FSMContext):
         target = data['target']
         start_value = data['start_value']
         figi = data['figi']
+        analytic_nickname = data['analytic_nickname']
+        analytic_rating = data['analytic_rating']
     db_session = message.bot.get('db')
     prediction: Prediction = await Prediction.add_predict(db_session=db_session,
                                                           ticker=ticker,
@@ -190,11 +197,15 @@ async def publish(message: Message, state: FSMContext):
                                                           predicted_value=target,
                                                           analytic_id=message.from_user.id)
     print(prediction.__dict__)
-    await message.answer(f'Акця {ticker}, new target {target} через {predict_time} дней',
+
+
+    await message.answer(f'Акця ${ticker} ({name}), {start_value} {currency} -----> {target} {currency} через {predict_time} дней.\n'
+                         f'Аналитик: {analytic_nickname}, rating: {analytic_rating}',
                          reply_markup=ReplyKeyboardRemove())
     channel_id=config.tg_bot.channel_id
     await message.bot.send_message(chat_id=channel_id,
-                                   text=f'Акця ${ticker} ({name}), {start_value} {currency} -----> {target} {currency} через {predict_time} дней.')
+                                   text=f'Акця ${ticker} ({name}), {start_value} {currency} -----> {target} {currency} через {predict_time} дней.\n'
+                         f'Аналитик: {analytic_nickname}, rating: {analytic_rating}')
     await state.finish()
 
 

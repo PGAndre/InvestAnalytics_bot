@@ -95,7 +95,7 @@ class Prediction(Base):
     start_value = Column(Numeric(12, 2))
     predicted_value = Column(Numeric(12, 2), nullable=False)
     end_value = Column(Numeric(12, 2))
-    analytic_id = Column(BigInteger, ForeignKey(Analytic.telegram_id), nullable=False)
+    analytic_id = Column(BigInteger, ForeignKey(Analytic.telegram_id, ondelete="CASCADE"), nullable=False)
     rating = Column(Numeric(4, 2))
     updated_date = Column(DateTime, onupdate=func.now())
     is_active = Column(Boolean, default=True, nullable=False)

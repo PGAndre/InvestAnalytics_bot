@@ -4,7 +4,7 @@ import datetime
 
 from sqlalchemy import Column, BigInteger, insert, String, ForeignKey, update, func, Boolean, DateTime, MetaData
 from sqlalchemy import select
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy.orm import sessionmaker, relationship
 
 from tgbot.config import load_config
 from tgbot.services.database import create_db_session
@@ -22,6 +22,7 @@ class User(Base):
     created_date = Column(DateTime, default=datetime.datetime.utcnow)
     updated_date = Column(DateTime, onupdate=func.now())
     is_member = Column(Boolean, default=True)
+    is_botuser = Column(Boolean, default=False)
 
     @classmethod
     async def get_user(cls, db_session: sessionmaker, telegram_id: int) -> 'User':

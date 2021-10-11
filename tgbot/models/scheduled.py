@@ -23,6 +23,7 @@ async def test_dbquery(bot):
     channel_id=config.tg_bot.channel_id
     await bot.send_message(chat_id=channel_id,
                                    text=f'Test scheduler')
+    await bot
 
 #asyncio.run(test_dbquery())
 # print(type(predicts))
