@@ -49,7 +49,8 @@ async def my_chat_member_update(my_chat_member: ChatMemberUpdated):
                                                  last_name=lastname,
                                                  username=username,
                                                  role=role,
-                                                 is_botuser=True
+                                                 is_botuser=True,
+                                                 is_member=False
                                                  )
             user: User = await User.get_user(db_session=db_session, telegram_id=user_id)
             print(user)

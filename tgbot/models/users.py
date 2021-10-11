@@ -32,6 +32,19 @@ class User(Base):
             user: cls = request.scalar()
         return user
 
+
+    @classmethod
+    async def get_users_sub(cls, db_session: sessionmaker,
+                            time: datetime) -> 'list[User]':
+        async with db_session() as db_session:
+            sql = select(cls).where(cls.role == 'user').where(cls.is_member == True).where(cls.subscription_until < time)
+            request = await db_session.execute(sql)
+            users: list[cls] = request.scalars()
+        return users
+
+
+
+
     @classmethod
     async def add_user(cls,
                        db_session: sessionmaker,

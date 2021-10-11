@@ -128,10 +128,10 @@ async def predictions_active_finished():
     bot = Bot(token=config.tg_bot.token, parse_mode='HTML')
     channel_id = config.tg_bot.channel_id
     #await bot.kick_chat_member(chat_id=channel_id, user_id=2065163769, until_date=timedelta(seconds=31))
-    try:
-        await bot.send_message(chat_id=2065163769, text=f'skljfksdjfksdj')
-    except BotBlocked:
-        print(f'Bot ЗАБЛОКИРОВАН!!!')
+    # try:
+    #     await bot.send_message(chat_id=2065163769, text=f'skljfksdjfksdj')
+    # except BotBlocked:
+    #     print(f'Bot ЗАБЛОКИРОВАН!!!')
     db_session = await create_db_session(config)
     # список всех предиктов is_active
     predictions: list[Prediction] = await Prediction.get_active_finished_predicts(db_session=db_session)

@@ -66,20 +66,20 @@ async def chat_member_update(chat_member: ChatMemberUpdated):
                 kicked = await chat.kick(user_id, until_date=timedelta(seconds=31))
 
             
-        # elif status == 'left':
-        #     print(f'пользователь {user_id} покинул в канал')
-        #     user: User = await User.get_user(db_session=db_session,
-        #                                      telegram_id=user_id)
-        #     if not user:
-        #         pass
-        #     else:
-        #         updated_user: User = await user.update_user(db_session=db_session,
-        #                                                     is_member=False,
-        #                                                     role=role)
-        #         updated_user: User = await User.get_user(db_session=db_session, telegram_id=user_id)
-        #         print(updated_user)
-        #         print(type(updated_user))
-        #         pprint.pprint(updated_user)
+        elif status == 'left':
+            print(f'пользователь {user_id} покинул в канал')
+            user: User = await User.get_user(db_session=db_session,
+                                             telegram_id=user_id)
+            if not user:
+                pass
+            else:
+                updated_user: User = await user.update_user(db_session=db_session,
+                                                            is_member=False,
+                                                            role=role)
+                updated_user: User = await User.get_user(db_session=db_session, telegram_id=user_id)
+                print(updated_user)
+                print(type(updated_user))
+                pprint.pprint(updated_user)
         elif status == 'kicked':
             user_id = chat_member.new_chat_member.user.id
             print(f'пользователь {user_id} был kicked')

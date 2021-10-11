@@ -15,6 +15,7 @@ from tgbot.handlers.botuser import register_botuser
 from tgbot.handlers.user import register_user
 from tgbot.middlewares.db import DbMiddleware
 from tgbot.misc.rating import calculate_rating_job
+from tgbot.misc.usersmanage import kick_users, notify_users_with_active_sub, notify_users_with_inactive_sub
 from tgbot.services.database import create_db_session
 
 logger = logging.getLogger(__name__)
@@ -61,6 +62,9 @@ async def main():
     print(datetime.now())
     #scheduler.add_job(calculate_rating_job, 'interval', seconds=5)
     scheduler.add_job(calculate_rating_job, "cron", hour='7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23')
+    scheduler.add_job(kick_users, "cron", hour='21')
+    scheduler.add_job(notify_users_with_active_sub, "cron", hour='20')
+    scheduler.add_job(notify_users_with_inactive_sub, 'interval', days=7)
 
     #register_all_middlewares(dp)
     register_all_filters(dp)
