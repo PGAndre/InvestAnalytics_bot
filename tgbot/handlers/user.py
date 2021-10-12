@@ -9,17 +9,13 @@ from tgbot.misc import misc
 from tgbot.models.users import User
 
 
-async def user_start(message: Message):
-    user = message.from_user.username
-    await message.reply(f"Hello, {user} ! \n /predict, чтобы создать прогноз")
-
-
 async def chat_member_update(chat_member: ChatMemberUpdated):
     chat_member = chat_member
     print(f'{chat_member} новый мембер')
     config = chat_member.bot.get('config')
     db_session = chat_member.bot.get('db')
-    if chat_member.chat.id == config.tg_bot.channel_id:  # если чат совпадает с чатом из конфига
+    if chat_member.chat.id == config.tg_bot.channel_id:
+        chat = chat_member.chat# если чат совпадает с чатом из конфига
         user_id = chat_member.from_user.id
         firstname = chat_member.from_user.first_name
         username = chat_member.from_user.username
@@ -32,7 +28,7 @@ async def chat_member_update(chat_member: ChatMemberUpdated):
         if isAnalytic:
             role = 'analytic'
         print(f'Аналитик??? {isAnalytic}')
-        isadmin = str(user_id) in admins
+        isadmin = user_id in admins
         if isadmin:
             role = 'admin'
 
@@ -51,7 +47,7 @@ async def chat_member_update(chat_member: ChatMemberUpdated):
                                                      username=username,
                                                      role=role
                                                      )
-                new_user: User = await User.get_user(db_session=db_session, telegram_id=user_id)
+                user: User = await User.get_user(db_session=db_session, telegram_id=user_id)
                 print(new_user)
                 print(type(new_user))
 
@@ -60,11 +56,16 @@ async def chat_member_update(chat_member: ChatMemberUpdated):
                 updated_user: User = await user.update_user(db_session=db_session,
                                                             is_member=True,
                                                             role=role)
-                updated_user: User = await User.get_user(db_session=db_session, telegram_id=user_id)
+                user: User = await User.get_user(db_session=db_session, telegram_id=user_id)
                 print(updated_user)
                 print(type(updated_user))
                 pprint.pprint(updated_user)
 
+            print(f'ВРЕМЯ СЕЙЧАС {datetime.utcnow()}')
+            if (user.subscription_until <= datetime.utcnow()) and (user.role == 'user'):
+                kicked = await chat.kick(user_id, until_date=timedelta(seconds=31))
+
+            
         elif status == 'left':
             print(f'пользователь {user_id} покинул в канал')
             user: User = await User.get_user(db_session=db_session,
@@ -79,6 +80,23 @@ async def chat_member_update(chat_member: ChatMemberUpdated):
                 print(updated_user)
                 print(type(updated_user))
                 pprint.pprint(updated_user)
+        elif status == 'kicked':
+            user_id = chat_member.new_chat_member.user.id
+            print(f'пользователь {user_id} был kicked')
+            user: User = await User.get_user(db_session=db_session,
+                                             telegram_id=user_id)
+            if not user:
+                pass
+            else:
+                updated_user: User = await user.update_user(db_session=db_session,
+                                                            is_member=False,
+                                                            role=role)
+                updated_user: User = await User.get_user(db_session=db_session, telegram_id=user_id)
+                print(updated_user)
+                print(type(updated_user))
+                pprint.pprint(updated_user)
+
+
         print(status)
 
         # await User.add_user(db_session=db_session,
@@ -88,5 +106,4 @@ async def chat_member_update(chat_member: ChatMemberUpdated):
 
 
 def register_user(dp: Dispatcher):
-    dp.register_message_handler(user_start, commands=["start"], state="*")
     dp.register_chat_member_handler(chat_member_update)

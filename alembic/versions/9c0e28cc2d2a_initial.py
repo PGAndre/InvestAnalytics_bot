@@ -1,8 +1,8 @@
 """Initial
 
-Revision ID: b60a9ac811d3
+Revision ID: 9c0e28cc2d2a
 Revises: 
-Create Date: 2021-10-08 14:43:04.989662
+Create Date: 2021-10-11 18:27:18.667640
 
 """
 from alembic import op
@@ -10,7 +10,7 @@ import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
-revision = 'b60a9ac811d3'
+revision = '9c0e28cc2d2a'
 down_revision = None
 branch_labels = None
 depends_on = None
@@ -38,6 +38,7 @@ def upgrade():
     sa.Column('created_date', sa.DateTime(), nullable=True),
     sa.Column('updated_date', sa.DateTime(), nullable=True),
     sa.Column('is_member', sa.Boolean(), nullable=True),
+    sa.Column('is_botuser', sa.Boolean(), nullable=True),
     sa.PrimaryKeyConstraint('telegram_id')
     )
     op.create_table('Predicts',
@@ -57,7 +58,7 @@ def upgrade():
     sa.Column('updated_date', sa.DateTime(), nullable=True),
     sa.Column('is_active', sa.Boolean(), nullable=False),
     sa.Column('successful', sa.Boolean(), nullable=True),
-    sa.ForeignKeyConstraint(['analytic_id'], ['Analytics.telegram_id'], ),
+    sa.ForeignKeyConstraint(['analytic_id'], ['Analytics.telegram_id'], ondelete='CASCADE'),
     sa.PrimaryKeyConstraint('id')
     )
     # ### end Alembic commands ###

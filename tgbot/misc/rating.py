@@ -5,8 +5,10 @@ import pprint
 from datetime import datetime, timedelta
 from random import randint
 
+import aiogram
 import pytz
 from aiogram import Bot
+from aiogram.utils.exceptions import BotBlocked
 from tinvest import Candle
 
 from tgbot.config import load_config, Config
@@ -124,6 +126,12 @@ async def predictions_active_finished():
     config: Config = load_config()
     print(config.tg_bot.token)
     bot = Bot(token=config.tg_bot.token, parse_mode='HTML')
+    channel_id = config.tg_bot.channel_id
+    #await bot.kick_chat_member(chat_id=channel_id, user_id=2065163769, until_date=timedelta(seconds=31))
+    # try:
+    #     await bot.send_message(chat_id=2065163769, text=f'skljfksdjfksdj')
+    # except BotBlocked:
+    #     print(f'Bot ЗАБЛОКИРОВАН!!!')
     db_session = await create_db_session(config)
     # список всех предиктов is_active
     predictions: list[Prediction] = await Prediction.get_active_finished_predicts(db_session=db_session)
@@ -155,9 +163,10 @@ async def predictions_active_finished():
             text = f'''Прогноз по акции {updated_prediction.ticker}  не сбылся . 
                     Рейтинг Прогноза {updated_prediction.rating}
                     Рейтинг аналитика {analytic.Nickname}: {analytic.rating} -----> {updated_analytic.rating} .'''
-        channel_id=config.tg_bot.channel_id
+
         await bot.send_message(chat_id=channel_id,
                                text=text)
+
 
 
 # noinspection PyTypeChecker
