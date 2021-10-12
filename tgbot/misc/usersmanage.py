@@ -52,7 +52,7 @@ async def notify_users_with_active_sub():
 async def notify_users_with_inactive_sub():
     config: Config = load_config()
     db_session = await create_db_session(config)
-    users = await User.get_users_sub(db_session=db_session, time=datetime.now()-timedelta(days = 5))
+    users = await User.get_users_sub(db_session=db_session, time=datetime.now()-timedelta(days = 1000))
     users = [x for x in users if x.is_botuser == True]
     bot = Bot(token=config.tg_bot.token, parse_mode='HTML')
     channel_id = config.tg_bot.channel_id
@@ -67,7 +67,13 @@ async def notify_users_with_inactive_sub():
         except BotBlocked:
             print(f'Bot ЗАБЛОКИРОВАН!!!')
 
+# async def add_user_tochannel():
+#     config: Config = load_config()
+#     db_session = await create_db_session(config)
+#     bot = Bot(token=config.tg_bot.token, parse_mode='HTML')
+#     await bot.
 
 
+asyncio.run(notify_users_with_active_sub())
 asyncio.run(notify_users_with_inactive_sub())
-#asyncio.run(predictions_active_finished())
+asyncio.run(kick_users())

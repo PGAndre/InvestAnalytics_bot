@@ -28,7 +28,7 @@ async def chat_member_update(chat_member: ChatMemberUpdated):
         if isAnalytic:
             role = 'analytic'
         print(f'Аналитик??? {isAnalytic}')
-        isadmin = str(user_id) in admins
+        isadmin = user_id in admins
         if isadmin:
             role = 'admin'
 
@@ -62,7 +62,7 @@ async def chat_member_update(chat_member: ChatMemberUpdated):
                 pprint.pprint(updated_user)
 
             print(f'ВРЕМЯ СЕЙЧАС {datetime.utcnow()}')
-            if user.subscription_until <= datetime.utcnow():
+            if (user.subscription_until <= datetime.utcnow()) and (user.role == 'user'):
                 kicked = await chat.kick(user_id, until_date=timedelta(seconds=31))
 
             
