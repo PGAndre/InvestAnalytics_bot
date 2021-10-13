@@ -100,14 +100,14 @@ async def get_latest_cost_history(figi: str, config: Config, to_time: datetime):
                                                         interval=CandleResolution.hour, config=config)
     print(candles)
     count = 0
-    for candle in candles.candles:
-        pprint.pprint(candle)
-        count = count+1
-        print(count)
-    print(count)
-    print(type(candles.candles))
-    print(max(candle.h for candle in candles.candles))
-    print(max(candles.candles, key=lambda item: item.h))  # среди всех объектов свечей выдаёт ту, у которой значение h(high price) максимально
+    # for candle in candles.candles:
+    #     pprint.pprint(candle)
+    #     count = count+1
+    #     print(count)
+    # print(count)
+    # print(type(candles.candles))
+    # print(max(candle.h for candle in candles.candles))
+    # print(max(candles.candles, key=lambda item: item.h))  # среди всех объектов свечей выдаёт ту, у которой значение h(high price) максимально
     return candles.candles[-1].c
 
 
