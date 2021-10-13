@@ -13,6 +13,7 @@ async def chat_member_update(chat_member: ChatMemberUpdated):
     chat_member = chat_member
     print(f'{chat_member} новый мембер')
     config = chat_member.bot.get('config')
+
     db_session = chat_member.bot.get('db')
     if chat_member.chat.id == config.tg_bot.channel_id:
         chat = chat_member.chat# если чат совпадает с чатом из конфига
@@ -32,6 +33,18 @@ async def chat_member_update(chat_member: ChatMemberUpdated):
         if isadmin:
             role = 'admin'
 
+            # запущен ли бот в бесплатном режиме.
+        free = config.test.free
+        if free:
+            subscription_until_str = config.test.free_subtime
+        else:
+            subscription_until_str = config.test.prod_subtime
+
+
+        subscription_until = datetime.strptime(subscription_until_str, '%d/%m/%y %H:%M:%S')
+
+        print("The type of the date is now", type(subscription_until))
+        print("The date is", subscription_until)
 
         if status == 'member':
             print(f'пользователь {user_id} вошел в канал')
@@ -40,7 +53,7 @@ async def chat_member_update(chat_member: ChatMemberUpdated):
             print(user)
             if not user:
                 new_user: User = await User.add_user(db_session=db_session,
-                                                     subscription_until=datetime.utcnow() + timedelta(days=1000),
+                                                     subscription_until=subscription_until,
                                                      telegram_id=user_id,
                                                      first_name=firstname,
                                                      last_name=lastname,
@@ -65,6 +78,10 @@ async def chat_member_update(chat_member: ChatMemberUpdated):
             if (user.subscription_until <= datetime.utcnow()) and (user.role == 'user'):
                 kicked = await chat.kick(user_id, until_date=timedelta(seconds=31))
 
+            invite_link = chat_member.invite_link
+            if invite_link.creator.id == chat_member.bot.id:
+                await chat_member.bot.revoke_chat_invite_link(config.tg_bot.channel_id, invite_link=invite_link.invite_link
+                                                              )
             
         elif status == 'left':
             print(f'пользователь {user_id} покинул в канал')

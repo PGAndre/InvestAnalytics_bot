@@ -3,12 +3,19 @@ from dataclasses import dataclass
 from environs import Env
 
 
+
 @dataclass
 class DbConfig:
     host: str
     password: str
     user: str
     database: str
+
+@dataclass
+class TestMode:
+    free: bool
+    free_subtime: str
+    prod_subtime: str
 
 
 @dataclass
@@ -30,6 +37,7 @@ class Config:
     tg_bot: TgBot
     db: DbConfig
     misc: Miscellaneous
+    test: TestMode
 
 
 def load_config(path: str = None):
@@ -37,6 +45,11 @@ def load_config(path: str = None):
     env.read_env(path)
 
     return Config(
+        test=TestMode(
+            free=env.bool("FREE"),
+            free_subtime=env.str("FREE_SUBTIME"),
+            prod_subtime=env.str("PROD_SUBTIME")
+        ),
         tg_bot=TgBot(
             token=env.str("BOT_TOKEN"),
             #admin_ids=env.list("ADMINS"),
