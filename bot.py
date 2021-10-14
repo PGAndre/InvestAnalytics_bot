@@ -62,8 +62,8 @@ async def main():
     print(datetime.now())
     #scheduler.add_job(calculate_rating_job, 'interval', seconds=5)
     scheduler.add_job(calculate_rating_job, "cron", hour='7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23')
-    scheduler.add_job(kick_users, "cron", hour='21')
-    scheduler.add_job(notify_users_with_active_sub, "cron", hour='20')
+    scheduler.add_job(kick_users, "cron", hour='18')
+    scheduler.add_job(notify_users_with_active_sub, "cron", hour='17')
     scheduler.add_job(notify_users_with_inactive_sub, 'interval', days=7)
 
     #register_all_middlewares(dp)
