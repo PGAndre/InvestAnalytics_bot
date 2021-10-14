@@ -4,7 +4,7 @@ from decimal import Decimal
 from aiogram import Dispatcher
 from datetime import datetime, timedelta
 from aiogram.dispatcher import FSMContext
-from aiogram.types import Message, ReplyKeyboardRemove
+from aiogram.types import Message, ReplyKeyboardRemove, InlineKeyboardMarkup, InlineKeyboardButton
 from aiogram.utils.markdown import hcode
 from sqlalchemy import MetaData
 
@@ -66,7 +66,8 @@ async def check_ticker(message: Message, state: FSMContext):
             await make_predict(message)
         else:
             print('акция найдена')
-            latestcost = await tinkoff.get_latest_cost_history(figi=instrument['figi'], config=config, to_time=datetime.utcnow())
+            latestcost = await tinkoff.get_latest_cost_history(figi=instrument['figi'], config=config,
+                                                               to_time=datetime.utcnow())
             text = f'Курс акции равен {latestcost} введис срок прогноза в днях'
             await message.answer(text, reply_markup=reply.cancel_back_markup)
             await state.update_data(ticker=ticker.upper())
@@ -144,7 +145,7 @@ async def confirm(message: Message, state: FSMContext):
 
     async with state.proxy() as data:
         start_value = data['start_value']
-    profit = (decimal.Decimal(target)-start_value)*100/start_value
+    profit = (decimal.Decimal(target) - start_value) * 100 / start_value
     print(profit)
     if profit > 30:
         await message.answer('доходность прогноза не должна привышать 30%.')
@@ -154,7 +155,6 @@ async def confirm(message: Message, state: FSMContext):
         print('возвращаюсь в set_date')
         await set_date(message, state)
         return
-
 
     # await message.answer(message)
     db_session = message.bot.get('db')
@@ -168,8 +168,9 @@ async def confirm(message: Message, state: FSMContext):
     target = data['target']
     name = data['name']
     currency = data['currency']
-    await message.answer(f'Акця ${ticker} ({name}), {start_value} {currency} -----> {target} {currency} через {predict_time} дней.\n'
-                         f'Аналитик: {analytic.Nickname}, rating: {analytic.rating}', reply_markup=reply.confirm)
+    await message.answer(
+        f'Акця ${ticker} ({name}), {start_value} {currency} -----> {target} {currency} через {predict_time} дней.\n'
+        f'Аналитик: {analytic.Nickname}, rating: {analytic.rating}', reply_markup=reply.confirm)
     await Predict.Publish.set()
 
 
@@ -197,15 +198,33 @@ async def publish(message: Message, state: FSMContext):
                                                           predicted_value=target,
                                                           analytic_id=message.from_user.id)
     print(prediction.__dict__)
+    days = 'дней'
+    if predict_time == 1:
+        days = 'день'
+    elif predict_time in [2, 3, 4]:
+        days = 'дня'
 
+    text = f'''
+        ${ticker} ({name})
+Цена: {start_value} {currency} --> {target} {currency}
+Через  {predict_time} {days}
+Аналитик: {analytic_nickname}
+Rating: {analytic_rating}'''
 
-    await message.answer(f'Акця ${ticker} ({name}), {start_value} {currency} -----> {target} {currency} через {predict_time} дней.\n'
-                         f'Аналитик: {analytic_nickname}, rating: {analytic_rating}',
+    await message.answer(text=text,
                          reply_markup=ReplyKeyboardRemove())
-    channel_id=config.tg_bot.channel_id
+    channel_id = config.tg_bot.channel_id
     await message.bot.send_message(chat_id=channel_id,
-                                   text=f'Акця ${ticker} ({name}), {start_value} {currency} -----> {target} {currency} через {predict_time} дней.\n'
-                         f'Аналитик: {analytic_nickname}, rating: {analytic_rating}')
+                                   text=text)
+    await message.bot.send_message(chat_id=channel_id,
+                                   text=f'Пульс ${ticker}',
+                                   reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+                                       [
+                                           InlineKeyboardButton(text="Open in Tinkoff",
+                                                                url=f'https://www.tinkoff.ru/invest/stocks/{ticker}')
+                                       ],
+                                   ])
+                                   )
     await state.finish()
 
 

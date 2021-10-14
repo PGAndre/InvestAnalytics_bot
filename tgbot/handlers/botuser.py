@@ -64,16 +64,30 @@ async def user_start(message: Message):
 
 
     if role == 'user':
-        invite_link = await message.bot.create_chat_invite_link(chat_id=config.tg_bot.channel_id, expire_date=timedelta(hours=1))
-        await message.answer(f"Hello, {username} ! \n Ваша ссылка для входа в канал: {invite_link.invite_link}")
+        if user.subscription_until < datetime.utcnow():
+            await message.answer(f"Hello, {username} ! \n Ваша подписка истекла. Обновите подписку для получения ссылки на канал.")
+        elif user.is_member == True:
+            await message.answer(
+                f"Hello, {username} ! \n Вы уже являетесь подписчиком канала.")
+        else:
+            invite_link = await message.bot.create_chat_invite_link(chat_id=config.tg_bot.channel_id, expire_date=timedelta(hours=1))
+            await message.answer(f"Hello, {username} ! \n Ваша ссылка для входа в канал: {invite_link.invite_link}")
 
     if role == 'analytic':
-        invite_link = await message.bot.create_chat_invite_link(chat_id=config.tg_bot.channel_id, expire_date=timedelta(hours=1))
-        await message.answer(f"Hello, {username} ! \n /predict, чтобы создать прогноз\n Ваша ссылка для входа в канал: {invite_link.invite_link}")
+        if user.is_member == True:
+            await message.answer(
+                f"Hello, {username} ! \n Вы уже являетесь подписчиком канала.")
+        else:
+            invite_link = await message.bot.create_chat_invite_link(chat_id=config.tg_bot.channel_id, expire_date=timedelta(hours=1))
+            await message.answer(f"Hello, {username} ! \n /predict, чтобы создать прогноз\n Ваша ссылка для входа в канал: {invite_link.invite_link}")
 
     if role == 'admin':
-        invite_link = await message.bot.create_chat_invite_link(chat_id=config.tg_bot.channel_id, expire_date=timedelta(hours=1))
-        await message.answer(f"Hello, {username}-admin ! \n Если забыл как войти - то вот: {invite_link.invite_link}")
+        if user.is_member == True:
+            await message.answer(
+                f"Hello, {username}-admin ! \n Вы уже являетесь подписчиком канала.")
+        else:
+            invite_link = await message.bot.create_chat_invite_link(chat_id=config.tg_bot.channel_id, expire_date=timedelta(hours=1))
+            await message.answer(f"Hello, {username}-admin ! \n Если забыл как войти - то вот: {invite_link.invite_link}")
 
 
 async def my_chat_member_update(my_chat_member: ChatMemberUpdated):

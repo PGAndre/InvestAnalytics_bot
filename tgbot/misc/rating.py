@@ -8,6 +8,7 @@ from random import randint
 import aiogram
 import pytz
 from aiogram import Bot
+from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 from aiogram.utils.exceptions import BotBlocked
 from tinvest import Candle
 
@@ -127,7 +128,7 @@ async def predictions_active_finished():
     print(config.tg_bot.token)
     bot = Bot(token=config.tg_bot.token, parse_mode='HTML')
     channel_id = config.tg_bot.channel_id
-    #await bot.kick_chat_member(chat_id=channel_id, user_id=2065163769, until_date=timedelta(seconds=31))
+    # await bot.kick_chat_member(chat_id=channel_id, user_id=2065163769, until_date=timedelta(seconds=31))
     # try:
     #     await bot.send_message(chat_id=2065163769, text=f'skljfksdjfksdj')
     # except BotBlocked:
@@ -140,7 +141,7 @@ async def predictions_active_finished():
         analytic_id = prediction.analytic_id
         prediction_rating = await prediction.calculate_rating()
 
-        analytic = await Analytic.get_analytic_by_id(db_session = db_session, telegram_id=prediction.analytic_id)
+        analytic = await Analytic.get_analytic_by_id(db_session=db_session, telegram_id=prediction.analytic_id)
 
         new_rating = await analytic.calculate_rating(prediction_rating)
         print(f' ПОСЧИТАННЫЙ РЕЙТИНГ АНАЛИТИКА {new_rating}')
@@ -157,16 +158,27 @@ async def predictions_active_finished():
         print(f' Аалитик: новое: {updated_analytic}, {updated_analytic.__dict__}')
         if prediction.successful:
             text = f'''Прогноз по акции {updated_prediction.ticker} сбылся {updated_prediction.end_date.date()}. 
-                   Рейтинг Прогноза {updated_prediction.rating}
-                   Рейтинг аналитика {analytic.Nickname}: {analytic.rating} -----> {updated_analytic.rating} .'''
+${updated_prediction.ticker}: {updated_prediction.start_value} {updated_prediction.currency} --> {updated_prediction.end_value} {updated_prediction.currency}
+Рейтинг Прогноза {updated_prediction.rating}
+Рейтинг аналитика {analytic.Nickname}: {analytic.rating} --> {updated_analytic.rating} .'''
         else:
             text = f'''Прогноз по акции {updated_prediction.ticker}  не сбылся . 
-                    Рейтинг Прогноза {updated_prediction.rating}
-                    Рейтинг аналитика {analytic.Nickname}: {analytic.rating} -----> {updated_analytic.rating} .'''
+${updated_prediction.ticker}: {updated_prediction.start_value} {updated_prediction.currency} --> {updated_prediction.end_value} {updated_prediction.currency}
+Рейтинг Прогноза {updated_prediction.rating}
+Рейтинг аналитика {analytic.Nickname}: {analytic.rating} --> {updated_analytic.rating} .'''
 
         await bot.send_message(chat_id=channel_id,
                                text=text)
 
+        await bot.send_message(chat_id=channel_id,
+                               text=f'Пульс ${updated_prediction.ticker}',
+                               reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+                                   [
+                                       InlineKeyboardButton(text=f"Open in Tinkoff",
+                                                            url=f'https://www.tinkoff.ru/invest/stocks/{updated_prediction.ticker}')
+                                   ],
+                               ])
+                               )
 
 
 # noinspection PyTypeChecker
@@ -202,7 +214,6 @@ async def prediction_candle_analys(prediction: Prediction, config: Config):
                                       config=config)).candles
 
         candles_dayly = [x for x in candles_dayly if x.time.replace(tzinfo=None) <= prediction.predicted_date]
-
 
         all_candles = candles_firsthour + candles_hourly + candles_dayly
         if not all_candles:
@@ -255,7 +266,6 @@ async def prediction_candle_analys(prediction: Prediction, config: Config):
                                       to=(prediction.start_date + timedelta(hours=1)).replace(minute=59, second=0),
                                       interval='minute',
                                       config=config)).candles
-
 
         candles_firsthour = [x for x in candles_firsthour if x.time.replace(tzinfo=None) >= prediction.start_date]
 
@@ -318,7 +328,6 @@ async def prediction_candle_analys(prediction: Prediction, config: Config):
             predictionanalysis = None
             return predictionanalysis
 
-
         print(f'dfgkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkk')
 
         candles_firsthour = [x for x in candles_firsthour if x.time.replace(tzinfo=None) >= prediction.start_date]
@@ -361,11 +370,21 @@ async def prediction_candle_analys(prediction: Prediction, config: Config):
         predictionAnalys: PredictionAnalys = PredictionAnalys(bestcandle_firsthour, first_candle_morethen_predicted,
                                                               prediction_index)
         return predictionAnalys
+    await message.bot.send_message(chat_id=channel_id,
+                                   text=text,
+                                   reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+                                       [
+                                           InlineKeyboardButton(text="Open Tinkoff",
+                                                                url=f'https://www.tinkoff.ru/invest/stocks/{ticker}')
+                                       ],
+                                   ])
+                                   )
 
 
 async def calculate_rating_job():
     await predictions_active()
     await predictions_active_finished()
 
-#asyncio.run(predictions_active())
-#asyncio.run(predictions_active_finished())
+
+asyncio.run(predictions_active())
+asyncio.run(predictions_active_finished())
