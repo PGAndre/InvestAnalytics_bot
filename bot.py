@@ -12,6 +12,7 @@ from tgbot.filters.analytic import *
 from tgbot.handlers.admin import register_admin
 from tgbot.handlers.analytic import *
 from tgbot.handlers.botuser import register_botuser
+from tgbot.handlers.channeluser import register_channeluser
 from tgbot.handlers.user import register_user
 from tgbot.middlewares.db import DbMiddleware
 from tgbot.misc.rating import calculate_rating_job
@@ -31,6 +32,7 @@ def register_all_filters(dp):
 
 
 def register_all_handlers(dp):
+    register_channeluser(dp)
     register_predict(dp)
     register_admin(dp)
     register_user(dp)
