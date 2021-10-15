@@ -76,7 +76,7 @@ async def user_start(message: Message):
     if role == 'analytic':
         if user.is_member == True:
             await message.answer(
-                f"Hello, {username} ! \n Вы уже являетесь подписчиком канала.")
+                f"Hello, {username} ! \n Вы уже являетесь подписчиком канала. ")
         else:
             invite_link = await message.bot.create_chat_invite_link(chat_id=config.tg_bot.channel_id, expire_date=timedelta(hours=1))
             await message.answer(f"Hello, {username} ! \n /predict, чтобы создать прогноз\n Ваша ссылка для входа в канал: {invite_link.invite_link}")
