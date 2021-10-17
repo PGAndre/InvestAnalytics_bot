@@ -11,7 +11,7 @@ from sqlalchemy import MetaData
 from tgbot.models.analytic import Prediction, Analytic
 from tgbot.keyboards import reply
 from tgbot.state.predict import Predict
-from tgbot.misc import tinkoff
+from tgbot.misc import tinkoff, bdays
 
 
 async def make_predict(message: Message):
@@ -68,7 +68,7 @@ async def check_ticker(message: Message, state: FSMContext):
             print('акция найдена')
             latestcost = await tinkoff.get_latest_cost_history(figi=instrument['figi'], config=config,
                                                                to_time=datetime.utcnow())
-            text = f'Курс акции равен {latestcost} введис срок прогноза в днях'
+            text = f'Курс акции равен {latestcost}.\nВведите срок прогноза в днях(учитываются только торговые дни)'
             await message.answer(text, reply_markup=reply.cancel_back_markup)
             await state.update_data(ticker=ticker.upper())
             await state.update_data(start_value=latestcost)
@@ -106,7 +106,7 @@ async def set_date(message: Message, state: FSMContext):
         return
 
     if predict_time > 30:
-        await message.answer('срок прогноза не должен превышать 30 дней')
+        await message.answer('срок прогноза не должен превышать 30 торговых дней')
         async with state.proxy() as data:
             message.text = data['ticker']
             print(message.text)
@@ -165,11 +165,12 @@ async def confirm(message: Message, state: FSMContext):
         data['analytic_rating'] = analytic.rating
     ticker = data['ticker']
     predict_time = data['predict_time']
+    predicted_date = await bdays.next_business_day(datetime.utcnow(), predict_time)
     target = data['target']
     name = data['name']
     currency = data['currency']
     await message.answer(
-        f'Акця ${ticker} ({name}), {start_value} {currency} -----> {target} {currency} через {predict_time} дней.\n'
+        f'Акця ${ticker} ({name}), {start_value} {currency} -----> {target} {currency} через {predict_time} торговых дней. ({predicted_date.date()})\n'
         f'Аналитик: {analytic.Nickname}, rating: {analytic.rating}', reply_markup=reply.confirm)
     await Predict.Publish.set()
 
@@ -186,14 +187,14 @@ async def publish(message: Message, state: FSMContext):
         figi = data['figi']
         analytic_nickname = data['analytic_nickname']
         analytic_rating = data['analytic_rating']
+        predicted_date = await bdays.next_business_day(datetime.utcnow(), predict_time)
     db_session = message.bot.get('db')
     prediction: Prediction = await Prediction.add_predict(db_session=db_session,
                                                           ticker=ticker,
                                                           name=name,
                                                           currency=currency,
                                                           figi=figi,
-                                                          predicted_date=(
-                                                                  datetime.utcnow() + timedelta(days=predict_time)),
+                                                          predicted_date=predicted_date,
                                                           start_value=start_value,
                                                           predicted_value=target,
                                                           analytic_id=message.from_user.id)
@@ -207,7 +208,7 @@ async def publish(message: Message, state: FSMContext):
     text = f'''
         ${ticker} ({name})
 Цена: {start_value} {currency} --> {target} {currency}
-Через  {predict_time} {days}
+Дата окончания:  {predicted_date.date()}
 Аналитик: {analytic_nickname}
 Rating: {analytic_rating}'''
 

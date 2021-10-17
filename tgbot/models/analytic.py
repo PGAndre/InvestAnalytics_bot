@@ -11,6 +11,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import sessionmaker, relationship
 
 from tgbot.config import load_config
+from tgbot.misc import bdays
 from tgbot.services.database import create_db_session
 from tgbot.services.db_base import Base
 
@@ -200,6 +201,7 @@ class Prediction(Base):
         predicted_date = self.predicted_date
         end_date = self.end_date
         predict_days = (end_date.date() - start_date.date()).days
+        predict_days = await bdays.count_tdays(start_date, end_date)
 
 
         print(f'predicted_days: {predict_days}')
