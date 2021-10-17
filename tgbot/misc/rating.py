@@ -370,21 +370,21 @@ async def prediction_candle_analys(prediction: Prediction, config: Config):
         predictionAnalys: PredictionAnalys = PredictionAnalys(bestcandle_firsthour, first_candle_morethen_predicted,
                                                               prediction_index)
         return predictionAnalys
-    await message.bot.send_message(chat_id=channel_id,
-                                   text=text,
-                                   reply_markup=InlineKeyboardMarkup(inline_keyboard=[
-                                       [
-                                           InlineKeyboardButton(text="Open Tinkoff",
-                                                                url=f'https://www.tinkoff.ru/invest/stocks/{ticker}')
-                                       ],
-                                   ])
-                                   )
+    # await message.bot.send_message(chat_id=channel_id,
+    #                                text=text,
+    #                                reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+    #                                    [
+    #                                        InlineKeyboardButton(text="Open Tinkoff",
+    #                                                             url=f'https://www.tinkoff.ru/invest/stocks/{ticker}')
+    #                                    ],
+    #                                ])
+    #                                )
 
 
 async def calculate_rating_job():
     await predictions_active()
     await predictions_active_finished()
 
-
-asyncio.run(predictions_active())
-asyncio.run(predictions_active_finished())
+#
+# asyncio.run(predictions_active())
+# asyncio.run(predictions_active_finished())

@@ -8,3 +8,4 @@ psycopg2-binary
 tinvest
 apscheduler
 faker
+pandas-market-calendars
