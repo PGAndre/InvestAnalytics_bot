@@ -220,10 +220,10 @@ class Prediction(Base):
         # print(predict_sign)
         # prediction_index = current_difference * predict_sign
 
-        rating = (1 + sign_profit*math.pow((min((32 - predict_days), 32)/32), 1/3)*math.pow(float(predicted_profit)/0.30, 1/3)*math.pow(min(abs(profit), predicted_profit)/predicted_profit, 1/3))/2
+        rating = (1 + sign_profit*math.pow((min((22 - predict_days), 22)/22), 1/3)*math.pow(float(predicted_profit)/0.30, 1/3)*math.pow(min(abs(profit), predicted_profit)/predicted_profit, 1/3))/2
 #        rating = (31 - predict_days)/30
         rating_rounded = round(rating*100, 2)
-        print(math.pow(min((32 - predict_days), 32)/32, 1/3))
+        print(math.pow(min((22 - predict_days), 22)/22, 1/3))
         print(math.pow(float(predicted_profit)/0.30, 1/3))
         print(math.pow(min(abs(profit), predicted_profit)/predicted_profit, 1/3))
         print(f'RATING: {rating_rounded}')

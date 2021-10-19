@@ -1,4 +1,5 @@
 import decimal
+import logging
 from decimal import Decimal
 
 from aiogram import Dispatcher
@@ -14,8 +15,12 @@ from tgbot.state.predict import Predict
 from tgbot.misc import tinkoff, bdays
 
 
+
+
 async def make_predict(message: Message):
     await message.answer("Введите название акции!", reply_markup=reply.cancel)
+    logger = logging.getLogger(__name__)
+    logger.info(f'{message.text, message.from_user.username, message.from_user.id}')
     print(message.text, message.from_user.username, message.from_user.id)
     await Predict.Check_Ticker.set()
 
@@ -215,6 +220,7 @@ Rating: {analytic_rating}'''
     await message.answer(text=text,
                          reply_markup=ReplyKeyboardRemove())
     channel_id = config.tg_bot.channel_id
+    logger.info(f'{text}')
     await message.bot.send_message(chat_id=channel_id,
                                    text=text)
     await message.bot.send_message(chat_id=channel_id,

@@ -1,5 +1,5 @@
 import asyncio
-import logging
+from logging.handlers import RotatingFileHandler
 
 from aiogram import Bot
 from aiogram.contrib.fsm_storage.memory import MemoryStorage
@@ -42,11 +42,17 @@ def register_all_handlers(dp):
 
 
 async def main():
+    handler1 = RotatingFileHandler('/usr/src/app/logs/invest.log', maxBytes=1000000, backupCount=10)
+    handler1.lever = logging.ERROR
+    handler2 = logging.StreamHandler()
+    handler2.level = logging.INFO
     logging.basicConfig(
         level=logging.INFO,
         format=u'%(filename)s:%(lineno)d #%(levelname)-8s [%(asctime)s] - %(name)s - %(message)s',
-
-    )
+        handlers=[
+            handler1,
+            handler2
+        ])
     logger.info("Starting bot")
     config = load_config(".env")
 
@@ -67,6 +73,7 @@ async def main():
     scheduler.add_job(kick_users, "cron", hour='18')
     scheduler.add_job(notify_users_with_active_sub, "cron", hour='17')
     scheduler.add_job(notify_users_with_inactive_sub, 'interval', days=7)
+    #scheduler.add_job(kick_users, 'interval', seconds=5)
 
     #register_all_middlewares(dp)
     register_all_filters(dp)

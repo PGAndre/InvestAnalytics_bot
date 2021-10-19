@@ -70,7 +70,7 @@ async def get_latest_cost(figi: str, config: Config, *args):
         candles: Candles = await get_market_candles(figi=figi, from_=fromtime, to=nowtime,
                                                     interval=CandleResolution.min10, config=config)
         if not candles.candles:
-            fromtime = datetime.utcnow() - timedelta(hours=56)
+            fromtime = datetime.utcnow() - timedelta(hours=100)
             candles: Candles = await get_market_candles(figi=figi, from_=fromtime, to=nowtime,
                                                         interval=CandleResolution.hour, config=config)
     # count = 0
@@ -95,7 +95,7 @@ async def get_latest_cost_history(figi: str, config: Config, to_time: datetime):
         candles: Candles = await get_market_candles(figi=figi, from_=fromtime, to=to_time,
                                                     interval=CandleResolution.min10, config=config)
         if not candles.candles:
-            fromtime = datetime.utcnow() - timedelta(hours=60)
+            fromtime = datetime.utcnow() - timedelta(hours=100)
             candles: Candles = await get_market_candles(figi=figi, from_=fromtime, to=to_time,
                                                         interval=CandleResolution.hour, config=config)
     print(candles)
