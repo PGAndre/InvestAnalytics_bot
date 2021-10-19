@@ -216,6 +216,7 @@ async def publish(message: Message, state: FSMContext):
 Дата окончания:  {predicted_date.date()}
 Аналитик: {analytic_nickname}
 Rating: {analytic_rating}'''
+    logger = logging.getLogger(__name__)
 
     await message.answer(text=text,
                          reply_markup=ReplyKeyboardRemove())
