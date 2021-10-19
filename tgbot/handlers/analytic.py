@@ -110,8 +110,8 @@ async def set_date(message: Message, state: FSMContext):
         await check_ticker(message, state)
         return
 
-    if predict_time > 30:
-        await message.answer('срок прогноза не должен превышать 30 торговых дней')
+    if predict_time > 20:
+        await message.answer('срок прогноза не должен превышать 20 торговых дней')
         async with state.proxy() as data:
             message.text = data['ticker']
             print(message.text)
