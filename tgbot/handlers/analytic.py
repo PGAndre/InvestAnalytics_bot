@@ -1,4 +1,5 @@
 import decimal
+import logging
 from decimal import Decimal
 
 from aiogram import Dispatcher
@@ -14,8 +15,12 @@ from tgbot.state.predict import Predict
 from tgbot.misc import tinkoff, bdays
 
 
+
+
 async def make_predict(message: Message):
     await message.answer("Введите название акции!", reply_markup=reply.cancel)
+    logger = logging.getLogger(__name__)
+    logger.info(f'{message.text, message.from_user.username, message.from_user.id}')
     print(message.text, message.from_user.username, message.from_user.id)
     await Predict.Check_Ticker.set()
 
@@ -105,8 +110,8 @@ async def set_date(message: Message, state: FSMContext):
         await check_ticker(message, state)
         return
 
-    if predict_time > 30:
-        await message.answer('срок прогноза не должен превышать 30 торговых дней')
+    if predict_time > 20:
+        await message.answer('срок прогноза не должен превышать 20 торговых дней')
         async with state.proxy() as data:
             message.text = data['ticker']
             print(message.text)
@@ -211,10 +216,12 @@ async def publish(message: Message, state: FSMContext):
 Дата окончания:  {predicted_date.date()}
 Аналитик: {analytic_nickname}
 Rating: {analytic_rating}'''
+    logger = logging.getLogger(__name__)
 
     await message.answer(text=text,
                          reply_markup=ReplyKeyboardRemove())
     channel_id = config.tg_bot.channel_id
+    logger.info(f'{text}')
     await message.bot.send_message(chat_id=channel_id,
                                    text=text)
     await message.bot.send_message(chat_id=channel_id,
