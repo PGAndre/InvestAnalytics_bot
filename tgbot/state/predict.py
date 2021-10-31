@@ -8,3 +8,10 @@ class Predict(StatesGroup):
     Confirm = State()
     Publish = State()
 
+class Analytics(StatesGroup):
+    Predict = State()
+    Check_Analytic = State()
+    Set_Nickname = State()
+    Publish = State()
+
+

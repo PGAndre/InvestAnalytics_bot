@@ -10,6 +10,7 @@ from aiogram.utils.markdown import hcode
 
 from tgbot.handlers.botuser import myinfo
 from tgbot.keyboards.analytic_menu import *
+from tgbot.keyboards.callback_datas import predict_callback
 
 from tgbot.models.analytic import Prediction, Analytic
 from tgbot.keyboards import reply
@@ -122,6 +123,51 @@ async def get_invitelink(query: CallbackQuery):
         await query.message.answer(
             f"Hello, {username}, Analytic ! \nВаша ссылка для входа в канал: {invite_link.invite_link}")
 
+async def get_predict_list(query: CallbackQuery):
+    await query.answer()
+    config = query.bot.get('config')
+    db_session = query.bot.get('db')
+    logger=logging.getLogger(__name__)
+    # список всех предиктов is_active
+    predictions: list[Prediction] = await Prediction.get_active_predicts(db_session=db_session)
+    markup= InlineKeyboardMarkup(row_width=5)
+    for prediction in predictions:
+        button_text = f'${prediction.ticker}'
+        callback_data = predict_callback.new(ticker=prediction.ticker)
+        markup.insert(
+            InlineKeyboardButton(text=button_text, callback_data=callback_data)
+        )
+    markup.row(
+        InlineKeyboardButton('Main menu', callback_data=analytic_callback.new(action='main'))
+    )
+    await query.message.edit_text(text='Список активных прогнозов:', reply_markup=markup)
+
+
+async def predict_info(query: CallbackQuery, callback_data: dict):
+    db_session = query.bot.get('db')
+    logger=logging.getLogger(__name__)
+    await query.answer()
+    logger.info(f"{callback_data}")
+    ticker=callback_data.get('ticker')
+    logger.info(f'{ticker}')
+    predict = await Prediction.get_predict(db_session=db_session, ticker=ticker)
+    name = predict.name
+    start_value = predict.start_value
+    currency = predict.currency
+    predicted_date = predict.predicted_date
+    analytic_nickname = predict.analytic.Nickname
+    analytic_rating = predict.analytic.rating
+    target = predict.predicted_value
+    text = f'''
+            ${ticker} ({name})
+Цена: {start_value} {currency} --> {target} {currency}
+Дата окончания:  {predicted_date.date()}
+Аналитик: {analytic_nickname}
+Rating: {analytic_rating}'''
+
+    await query.message.answer(text=text)
+
+
 async def make_predict_button(query: CallbackQuery):
     await query.answer()
     await query.message.answer("Введите название акции!", reply_markup=reply.cancel)
@@ -163,8 +209,7 @@ async def check_ticker(message: Message, state: FSMContext):
     current_state = await state.get_state()
     ticker = message.text
     db_session = message.bot.get('db')
-    prediction: Prediction = await Prediction.get_predict(db_session=db_session, ticker=ticker,
-                                                          telegram_id=message.from_user.id)
+    prediction: Prediction = await Prediction.get_predict(db_session=db_session, ticker=ticker)
     config = message.bot.get('config')
     if not prediction:
         instrument = await tinkoff.search_by_ticker(message.text, config)
@@ -337,13 +382,15 @@ Rating: {analytic_rating}'''
     await state.finish()
 
 
-def register_predict(dp: Dispatcher):
-    dp.register_callback_query_handler(first_menu, analytic_callback.filter(action='pred'))
-    dp.register_callback_query_handler(make_predict_button, analytic_callback.filter(action='pred_1'))
-    dp.register_callback_query_handler(get_invitelink, analytic_callback.filter(action='link'))
-    #dp.register_callback_query_handler(main_menu, analytic_callback.filter(action='main'))
-    dp.register_callback_query_handler(myinfo, analytic_callback.filter(action='myinfo'))
+def register_analytic(dp: Dispatcher):
+    dp.register_callback_query_handler(first_menu, analytic_callback.filter(action='pred'), is_analytic=True, state="*")
+    dp.register_callback_query_handler(make_predict_button, analytic_callback.filter(action='pred_1'), is_analytic=True, state="*")
+    dp.register_callback_query_handler(get_invitelink, analytic_callback.filter(action='link'),  is_analytic=True, state="*")
+    dp.register_callback_query_handler(get_predict_list, analytic_callback.filter(action='pred_2'), is_analytic=True, state="*")
+    dp.register_callback_query_handler(main_menu, analytic_callback.filter(action='main'), is_analytic=True, state="*")
+    dp.register_callback_query_handler(myinfo, analytic_callback.filter(action='myinfo'), state="*")
     dp.register_message_handler(menu, commands=["menu"], state="*", is_analytic=True)
+    dp.register_callback_query_handler(predict_info, predict_callback.filter(), is_analytic=True, state="*")
 
     dp.register_message_handler(analytic_start, commands=["start"], state="*", is_analytic=True)
     dp.register_message_handler(cancel, text="отменить",

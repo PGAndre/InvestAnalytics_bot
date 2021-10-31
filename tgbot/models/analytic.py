@@ -39,8 +39,9 @@ class Analytic(Base):
     @classmethod
     async def add_analytic(cls,
                           db_session: sessionmaker,
-                          telegram_id: BigInteger) -> 'Analytic':
-        analytic: Analytic = Analytic(telegram_id=telegram_id)
+                          telegram_id: BigInteger,
+                          nickname: str) -> 'Analytic':
+        analytic: Analytic = Analytic(telegram_id=telegram_id, Nickname=nickname)
         async with db_session() as db_session:
             db_session.add(analytic)
             await db_session.commit()
@@ -131,14 +132,25 @@ class Prediction(Base):
     @classmethod
     async def get_predict(cls,
                           db_session: sessionmaker,
-                          ticker: str,
-                          telegram_id: BigInteger) -> 'Prediction':
+                          ticker: str) -> 'Prediction':
         async with db_session() as db_session:
             sql = select(cls).where(func.lower(cls.ticker) == func.lower(ticker)).where(cls.is_active == true()).join(Analytic,
-                                                                                       Analytic.telegram_id == telegram_id)
+                                                                                       Analytic.telegram_id == cls.analytic_id)
             request = await db_session.execute(sql)
             predict: cls = request.scalar()
             return predict
+
+    # @classmethod
+    # async def get_predict(cls,
+    #                       db_session: sessionmaker,
+    #                       ticker: str,
+    #                       telegram_id: BigInteger) -> 'Prediction':
+    #     async with db_session() as db_session:
+    #         sql = select(cls).where(func.lower(cls.ticker) == func.lower(ticker)).where(cls.is_active == true()).join(Analytic,
+    #                                                                                    Analytic.telegram_id == telegram_id)
+    #         request = await db_session.execute(sql)
+    #         predict: cls = request.scalar()
+    #         return predict
 
     # функция возвращает активных list[Prediction]
     @classmethod

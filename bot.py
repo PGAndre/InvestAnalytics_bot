@@ -33,8 +33,8 @@ def register_all_filters(dp):
 
 def register_all_handlers(dp):
     register_channeluser(dp)
-    register_predict(dp)
     register_admin(dp)
+    register_analytic(dp)
     register_user(dp)
     register_botuser(dp)
 
