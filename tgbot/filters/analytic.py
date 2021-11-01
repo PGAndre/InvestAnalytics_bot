@@ -22,6 +22,5 @@ class AnalyticFilter(BoundFilter):
         listof_analytics = []
         for analytic in analytics:
             listof_analytics.append(analytic.telegram_id)
-        print(listof_analytics)
         # return obj.from_user.id in config.tg_bot.analytic_ids
         return obj.from_user.id in listof_analytics

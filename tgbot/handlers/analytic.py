@@ -5,29 +5,182 @@ from decimal import Decimal
 from aiogram import Dispatcher
 from datetime import datetime, timedelta
 from aiogram.dispatcher import FSMContext
-from aiogram.types import Message, ReplyKeyboardRemove, InlineKeyboardMarkup, InlineKeyboardButton
+from aiogram.types import Message, ReplyKeyboardRemove, InlineKeyboardMarkup, InlineKeyboardButton, CallbackQuery
 from aiogram.utils.markdown import hcode
-from sqlalchemy import MetaData
+
+from tgbot.handlers.botuser import myinfo
+from tgbot.keyboards.analytic_menu import *
+from tgbot.keyboards.callback_datas import predict_callback
 
 from tgbot.models.analytic import Prediction, Analytic
 from tgbot.keyboards import reply
+from tgbot.models.users import User
 from tgbot.state.predict import Predict
 from tgbot.misc import tinkoff, bdays
 
 
+async def menu(message: Message):
+    await message.answer(text=main_menu_message(),
+                         reply_markup=main_menu_keyboard())
 
+
+async def main_menu(query: CallbackQuery):
+    await query.answer()
+    await query.message.edit_text(
+        text=main_menu_message(),
+        reply_markup=main_menu_keyboard())
+
+
+async def first_menu(query: CallbackQuery):
+    await query.answer()
+    await query.message.edit_text(
+        text=first_menu_message(),
+        reply_markup=first_menu_keyboard())
+
+
+async def second_menu(query: CallbackQuery):
+    await query.answer()
+    await query.message.edit_text(
+        text=second_menu_message(),
+        reply_markup=second_menu_keyboard())
+
+async def analytic_start(message: Message):
+    if message.chat.id != message.from_user.id:
+        return
+    config = message.bot.get('config')
+    db_session = message.bot.get('db')
+    user_id = message.from_user.id
+    firstname = message.from_user.first_name
+    username = message.from_user.username
+    lastname = message.from_user.last_name
+
+    role = 'analytic'
+    user: User = await User.get_user(db_session=db_session,
+                                     telegram_id=user_id)
+    # запущен ли бот в бесплатном режиме.
+    free = config.test.free
+    if free:
+        subscription_until_str = config.test.free_subtime
+    else:
+        subscription_until_str = config.test.prod_subtime
+
+    subscription_until = datetime.strptime(subscription_until_str, '%d/%m/%y %H:%M:%S')
+    logger = logging.getLogger(__name__)
+    if not user:
+        new_user: User = await User.add_user(db_session=db_session,
+                                             subscription_until=subscription_until,
+                                             telegram_id=user_id,
+                                             first_name=firstname,
+                                             last_name=lastname,
+                                             username=username,
+                                             role=role,
+                                             is_botuser=True,
+                                             is_member=False
+                                             )
+        user: User = await User.get_user(db_session=db_session, telegram_id=user_id)
+        logger.info(f'новый аналитик {user.telegram_id}, {user.username}, {user.first_name} зарегестриован в базе')
+        logger.info(f'{user.__dict__}')
+
+
+    else:  # если такой пользователь уже найден - меняем ему статус is_member = true
+        updated_user: User = await user.update_user(db_session=db_session,
+                                                    role=role,
+                                                    is_botuser=True)
+        user: User = await User.get_user(db_session=db_session, telegram_id=user_id)
+        logger.info(
+            f'роль пользователя {user.telegram_id}, {user.username}, {user.first_name} обновлена в базе на Analytic')
+        logger.info(f'{user.__dict__}')
+
+    await message.answer(
+        f'''Hello, {username} !
+    /menu - чтобы попасть в основное меню
+    /help - Информация.
+    ''')
+
+async def get_invitelink(query: CallbackQuery):
+    # если пишут в другой чат, а не боту.
+    if query.message.chat.id != query.from_user.id:
+        return
+    await query.answer()
+    config = query.bot.get('config')
+    db_session = query.bot.get('db')
+    user_id = query.from_user.id
+    firstname = query.from_user.first_name
+    username = query.from_user.username
+    lastname = query.from_user.last_name
+
+    user: User = await User.get_user(db_session=db_session,
+                                     telegram_id=user_id)
+    # запущен ли бот в бесплатном режиме.
+    logger = logging.getLogger(__name__)
+
+    if user.is_member == True:
+        await query.message.answer(
+            f"Hello, {username} ! \n Вы уже являетесь подписчиком канала. ")
+    else:
+        invite_link = await query.bot.create_chat_invite_link(chat_id=config.tg_bot.channel_id,
+                                                                expire_date=timedelta(hours=1))
+        await query.message.answer(
+            f"Hello, {username}, Analytic ! \nВаша ссылка для входа в канал: {invite_link.invite_link}")
+
+async def get_predict_list(query: CallbackQuery):
+    await query.answer()
+    config = query.bot.get('config')
+    db_session = query.bot.get('db')
+    logger=logging.getLogger(__name__)
+    # список всех предиктов is_active
+    predictions: list[Prediction] = await Prediction.get_active_predicts(db_session=db_session)
+    markup= InlineKeyboardMarkup(row_width=5)
+    for prediction in predictions:
+        button_text = f'${prediction.ticker}'
+        callback_data = predict_callback.new(ticker=prediction.ticker)
+        markup.insert(
+            InlineKeyboardButton(text=button_text, callback_data=callback_data)
+        )
+    markup.row(
+        InlineKeyboardButton('Main menu', callback_data=analytic_callback.new(action='main'))
+    )
+    await query.message.edit_text(text='Список активных прогнозов:', reply_markup=markup)
+
+
+async def predict_info(query: CallbackQuery, callback_data: dict):
+    db_session = query.bot.get('db')
+    logger=logging.getLogger(__name__)
+    await query.answer()
+    logger.info(f"{callback_data}")
+    ticker=callback_data.get('ticker')
+    logger.info(f'{ticker}')
+    predict = await Prediction.get_predict(db_session=db_session, ticker=ticker)
+    name = predict.name
+    start_value = predict.start_value
+    currency = predict.currency
+    predicted_date = predict.predicted_date
+    analytic_nickname = predict.analytic.Nickname
+    analytic_rating = predict.analytic.rating
+    target = predict.predicted_value
+    text = f'''
+            ${ticker} ({name})
+Цена: {start_value} {currency} --> {target} {currency}
+Дата окончания:  {predicted_date.date()}
+Аналитик: {analytic_nickname}
+Rating: {analytic_rating}'''
+
+    await query.message.answer(text=text)
+
+
+async def make_predict_button(query: CallbackQuery):
+    await query.answer()
+    await query.message.answer("Введите название акции!", reply_markup=reply.cancel)
+    await Predict.Check_Ticker.set()
 
 async def make_predict(message: Message):
     await message.answer("Введите название акции!", reply_markup=reply.cancel)
-    logger = logging.getLogger(__name__)
-    logger.info(f'{message.text, message.from_user.username, message.from_user.id}')
-    print(message.text, message.from_user.username, message.from_user.id)
     await Predict.Check_Ticker.set()
 
 
-# async def repeat_predict(message: Message, state:FSMContext):
-#     await message.text("Введите название акции")
-#     print(message.text, message.from_user.username, message.from_user.id)
+# async def repeat_predict(query: query, state:FSMContext):
+#     await query.text("Введите название акции")
+#     print(query.text, query.from_user.username, query.from_user.id)
 #     await Predict.Check_Ticker.set()
 
 async def cancel(message: Message, state: FSMContext):
@@ -44,7 +197,6 @@ async def back_to(message: Message, state: FSMContext):
         await message.answer('возврат к вводу даты', reply_markup=ReplyKeyboardRemove())
         async with state.proxy() as data:
             message.text = data['ticker']
-            print(message.text)
         await check_ticker(message, state)
     if current_state == 'Predict:Publish':
         await message.answer('Возврат к вводу цели', reply_markup=ReplyKeyboardRemove())
@@ -55,22 +207,18 @@ async def back_to(message: Message, state: FSMContext):
 
 async def check_ticker(message: Message, state: FSMContext):
     current_state = await state.get_state()
-    print(current_state)
     ticker = message.text
     db_session = message.bot.get('db')
-    prediction: Prediction = await Prediction.get_predict(db_session=db_session, ticker=ticker,
-                                                          telegram_id=message.from_user.id)
+    prediction: Prediction = await Prediction.get_predict(db_session=db_session, ticker=ticker)
     config = message.bot.get('config')
     if not prediction:
         instrument = await tinkoff.search_by_ticker(message.text, config)
-        print(instrument)
         if len(instrument) == 0:
             text = f'Такой акции не существует'
             await message.answer(text, reply_markup=reply.cancel_back_markup)
             state = await state.reset_state()
             await make_predict(message)
         else:
-            print('акция найдена')
             latestcost = await tinkoff.get_latest_cost_history(figi=instrument['figi'], config=config,
                                                                to_time=datetime.utcnow())
             text = f'Курс акции равен {latestcost}.\nВведите срок прогноза в днях(учитываются только торговые дни)'
@@ -82,8 +230,6 @@ async def check_ticker(message: Message, state: FSMContext):
             await state.update_data(currency=instrument['currency'])
             await Predict.Set_Date.set()
     else:
-        print(prediction.__dict__)
-        print(prediction.analytic.__dict__)
         await message.answer("уже есть активный прогноз по этой акции")
         # await Predict.Predict.set()
         state = await state.reset_state()
@@ -96,9 +242,6 @@ async def check_ticker(message: Message, state: FSMContext):
 
 
 async def set_date(message: Message, state: FSMContext):
-    async with state.proxy() as data:
-        print(f'я в Set_date  message: {message.text}, state: {data.state}')
-
     try:
         predict_time = int(message.text)
     except ValueError:
@@ -114,7 +257,6 @@ async def set_date(message: Message, state: FSMContext):
         await message.answer('срок прогноза не должен превышать 20 торговых дней')
         async with state.proxy() as data:
             message.text = data['ticker']
-            print(message.text)
         await Predict.Check_Ticker.set()
         await check_ticker(message, state)
         return
@@ -131,7 +273,6 @@ async def set_date(message: Message, state: FSMContext):
 
     # await state.update_data(predict_time=predict_time)
     await message.answer(f'Введите новую цель акции {ticker}', reply_markup=reply.cancel_back_markup)
-    print(f'я тут')
     await Predict.Confirm.set()
 
 
@@ -144,20 +285,26 @@ async def confirm(message: Message, state: FSMContext):
         async with state.proxy() as data:
             message.text = data['predict_time']
         await Predict.Set_Date.set()
-        print('возвращаюсь в set_date')
         await set_date(message, state)
         return
 
     async with state.proxy() as data:
         start_value = data['start_value']
     profit = (decimal.Decimal(target) - start_value) * 100 / start_value
-    print(profit)
-    if profit > 30:
+    if abs(profit) > 30:
         await message.answer('доходность прогноза не должна привышать 30%.')
         async with state.proxy() as data:
             message.text = data['predict_time']
         await Predict.Set_Date.set()
         print('возвращаюсь в set_date')
+        await set_date(message, state)
+        return
+
+    if abs(profit) < 3:
+        await message.answer('доходность прогноза должна быть меньше 3%.')
+        async with state.proxy() as data:
+            message.text = data['predict_time']
+        await Predict.Set_Date.set()
         await set_date(message, state)
         return
 
@@ -203,7 +350,6 @@ async def publish(message: Message, state: FSMContext):
                                                           start_value=start_value,
                                                           predicted_value=target,
                                                           analytic_id=message.from_user.id)
-    print(prediction.__dict__)
     days = 'дней'
     if predict_time == 1:
         days = 'день'
@@ -236,7 +382,17 @@ Rating: {analytic_rating}'''
     await state.finish()
 
 
-def register_predict(dp: Dispatcher):
+def register_analytic(dp: Dispatcher):
+    dp.register_callback_query_handler(first_menu, analytic_callback.filter(action='pred'), is_analytic=True, state="*")
+    dp.register_callback_query_handler(make_predict_button, analytic_callback.filter(action='pred_1'), is_analytic=True, state="*")
+    dp.register_callback_query_handler(get_invitelink, analytic_callback.filter(action='link'),  is_analytic=True, state="*")
+    dp.register_callback_query_handler(get_predict_list, analytic_callback.filter(action='pred_2'), is_analytic=True, state="*")
+    dp.register_callback_query_handler(main_menu, analytic_callback.filter(action='main'), is_analytic=True, state="*")
+    dp.register_callback_query_handler(myinfo, analytic_callback.filter(action='myinfo'), state="*")
+    dp.register_message_handler(menu, commands=["menu"], state="*", is_analytic=True)
+    dp.register_callback_query_handler(predict_info, predict_callback.filter(), is_analytic=True, state="*")
+
+    dp.register_message_handler(analytic_start, commands=["start"], state="*", is_analytic=True)
     dp.register_message_handler(cancel, text="отменить",
                                 state=[Predict.Check_Ticker, Predict.Set_Date, Predict.Confirm, Predict.Publish])
     dp.register_message_handler(back_to, text="назад", state=[Predict.Set_Date, Predict.Confirm, Predict.Publish])
