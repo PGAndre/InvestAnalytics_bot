@@ -11,6 +11,7 @@ from aiogram.utils.markdown import hcode
 from tgbot.handlers.botuser import myinfo
 from tgbot.keyboards.analytic_menu import *
 from tgbot.keyboards.callback_datas import predict_callback
+from tgbot.misc.misc import user_add_or_update
 
 from tgbot.models.analytic import Prediction, Analytic
 from tgbot.keyboards import reply
@@ -20,11 +21,13 @@ from tgbot.misc import tinkoff, bdays
 
 
 async def menu(message: Message):
+    user: User = await user_add_or_update(message, role='analytic', module=__name__)
     await message.answer(text=main_menu_message(),
                          reply_markup=main_menu_keyboard())
 
 
 async def main_menu(query: CallbackQuery):
+    user: User = await user_add_or_update(query, role='analytic', module=__name__)
     await query.answer()
     await query.message.edit_text(
         text=main_menu_message(),
@@ -32,6 +35,7 @@ async def main_menu(query: CallbackQuery):
 
 
 async def first_menu(query: CallbackQuery):
+    user: User = await user_add_or_update(query, role='analytic', module=__name__)
     await query.answer()
     await query.message.edit_text(
         text=first_menu_message(),
@@ -39,65 +43,23 @@ async def first_menu(query: CallbackQuery):
 
 
 async def second_menu(query: CallbackQuery):
+    user: User = await user_add_or_update(query, role='analytic', module=__name__)
     await query.answer()
     await query.message.edit_text(
         text=second_menu_message(),
         reply_markup=second_menu_keyboard())
 
 async def analytic_start(message: Message):
-    if message.chat.id != message.from_user.id:
-        return
-    config = message.bot.get('config')
-    db_session = message.bot.get('db')
-    user_id = message.from_user.id
-    firstname = message.from_user.first_name
-    username = message.from_user.username
-    lastname = message.from_user.last_name
-
-    role = 'analytic'
-    user: User = await User.get_user(db_session=db_session,
-                                     telegram_id=user_id)
-    # запущен ли бот в бесплатном режиме.
-    free = config.test.free
-    if free:
-        subscription_until_str = config.test.free_subtime
-    else:
-        subscription_until_str = config.test.prod_subtime
-
-    subscription_until = datetime.strptime(subscription_until_str, '%d/%m/%y %H:%M:%S')
-    logger = logging.getLogger(__name__)
-    if not user:
-        new_user: User = await User.add_user(db_session=db_session,
-                                             subscription_until=subscription_until,
-                                             telegram_id=user_id,
-                                             first_name=firstname,
-                                             last_name=lastname,
-                                             username=username,
-                                             role=role,
-                                             is_botuser=True,
-                                             is_member=False
-                                             )
-        user: User = await User.get_user(db_session=db_session, telegram_id=user_id)
-        logger.info(f'новый аналитик {user.telegram_id}, {user.username}, {user.first_name} зарегестриован в базе')
-        logger.info(f'{user.__dict__}')
-
-
-    else:  # если такой пользователь уже найден - меняем ему статус is_member = true
-        updated_user: User = await user.update_user(db_session=db_session,
-                                                    role=role,
-                                                    is_botuser=True)
-        user: User = await User.get_user(db_session=db_session, telegram_id=user_id)
-        logger.info(
-            f'роль пользователя {user.telegram_id}, {user.username}, {user.first_name} обновлена в базе на Analytic')
-        logger.info(f'{user.__dict__}')
+    user: User = await user_add_or_update(message, role='analytic', module=__name__)
 
     await message.answer(
-        f'''Hello, {username} !
+        f'''Hello, {user.username} - Analytic !
     /menu - чтобы попасть в основное меню
     /help - Информация.
     ''')
 
 async def get_invitelink(query: CallbackQuery):
+    user: User = await user_add_or_update(query, role='analytic', module=__name__)
     # если пишут в другой чат, а не боту.
     if query.message.chat.id != query.from_user.id:
         return
@@ -124,6 +86,7 @@ async def get_invitelink(query: CallbackQuery):
             f"Hello, {username}, Analytic ! \nВаша ссылка для входа в канал: {invite_link.invite_link}")
 
 async def get_predict_list(query: CallbackQuery):
+    user: User = await user_add_or_update(query, role='analytic', module=__name__)
     await query.answer()
     config = query.bot.get('config')
     db_session = query.bot.get('db')
@@ -169,6 +132,7 @@ Rating: {analytic_rating}'''
 
 
 async def make_predict_button(query: CallbackQuery):
+    user: User = await user_add_or_update(query, role='analytic', module=__name__)
     await query.answer()
     await query.message.answer("Введите название акции!", reply_markup=reply.cancel)
     await Predict.Check_Ticker.set()

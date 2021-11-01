@@ -11,6 +11,7 @@ from tgbot.handlers import user
 from tgbot.keyboards.callback_datas import user_callback
 from tgbot.keyboards.user_menu import *
 from tgbot.misc import misc
+from tgbot.misc.misc import user_add_or_update
 from tgbot.models.users import User
 
 
@@ -19,11 +20,13 @@ from tgbot.models.users import User
 
 
 async def menu(message: Message):
+    user: User = await user_add_or_update(message, role='user', module=__name__)
     await message.answer(text=main_menu_message(),
                          reply_markup=main_menu_keyboard())
 
 
 async def main_menu(query: CallbackQuery):
+    user: User = await user_add_or_update(query, role='user', module=__name__)
     await query.answer()
     await query.message.edit_text(
         text=main_menu_message(),
@@ -31,6 +34,7 @@ async def main_menu(query: CallbackQuery):
 
 
 async def first_menu(query: CallbackQuery):
+    user: User = await user_add_or_update(query, role='user', module=__name__)
     await query.answer()
     await query.message.edit_text(
         text=first_menu_message(),
@@ -38,6 +42,7 @@ async def first_menu(query: CallbackQuery):
 
 
 async def second_menu(query: CallbackQuery):
+    user: User = await user_add_or_update(query, role='user', module=__name__)
     await query.answer()
     await query.message.edit_text(
         text=second_menu_message(),
@@ -53,6 +58,7 @@ async def second_menu(query: CallbackQuery):
 #     inline_kb1 = InlineKeyboardMarkup().add(inline_btn_1)
 #     await message.answer("Первая инлайн кнопка", reply_markup=inline_kb1)
 async def myinfo(query: CallbackQuery):
+    user: User = await user_add_or_update(query, role='user', module=__name__)
     user_id=query.from_user.id
     username=query.from_user.username
     await query.answer()
@@ -60,11 +66,11 @@ async def myinfo(query: CallbackQuery):
 
 
 async def subscription_info(query: CallbackQuery):
+    user: User = await user_add_or_update(query, role='user', module=__name__)
     logger = logging.getLogger(__name__)
     user_id=query.from_user.id
     db_session = query.bot.get('db')
     await query.answer()
-    user = await User.get_user(db_session=db_session, telegram_id=user_id)
     subscription_until=user.subscription_until
     logger.info(f'подписка истекает {subscription_until}')
     if user.subscription_until < datetime.utcnow():
@@ -73,6 +79,7 @@ async def subscription_info(query: CallbackQuery):
         await query.message.answer(text=f'Ваша подписка истекает {subscription_until.date():%d-%m-%Y}')
 
 async def get_invitelink(query: CallbackQuery):
+    user: User = await user_add_or_update(query, role='user', module=__name__)
     # если пишут в другой чат, а не боту.
     if query.message.chat.id != query.from_user.id:
         return
@@ -84,9 +91,6 @@ async def get_invitelink(query: CallbackQuery):
     username = query.from_user.username
     lastname = query.from_user.last_name
 
-
-    user: User = await User.get_user(db_session=db_session,
-                                     telegram_id=user_id)
     # запущен ли бот в бесплатном режиме.
     logger = logging.getLogger(__name__)
 
@@ -104,6 +108,7 @@ async def get_invitelink(query: CallbackQuery):
         await query.message.answer(f"Hello, {username} ! \n Ваша ссылка для входа в канал: {invite_link.invite_link}")
 
 async def user_help(message: Message):
+    user: User = await user_add_or_update(message, role='user', module=__name__)
     if message.chat.id != message.from_user.id:
         return
     await message.answer(
@@ -111,87 +116,12 @@ async def user_help(message: Message):
    ''')
 
 async def user_start(message: Message):
-    # если пишут в другой чат, а не боту.
-    if message.chat.id != message.from_user.id:
-        return
-    config = message.bot.get('config')
-    db_session = message.bot.get('db')
-    user_id = message.from_user.id
-    firstname = message.from_user.first_name
-    username = message.from_user.username
-    lastname = message.from_user.last_name
-
-    role = 'user'
-    admins = config.tg_bot.admin_ids
-    isAnalytic = await misc.check(message)
-    if isAnalytic:
-        role = 'analytic'
-    print(f'Аналитик??? {isAnalytic}')
-    isadmin = user_id in admins
-    if isadmin:
-        role = 'admin'
-
-    user: User = await User.get_user(db_session=db_session,
-                                     telegram_id=user_id)
-    # запущен ли бот в бесплатном режиме.
-    free = config.test.free
-    if free:
-        subscription_until_str = config.test.free_subtime
-    else:
-        subscription_until_str = config.test.prod_subtime
-
-    subscription_until = datetime.strptime(subscription_until_str, '%d/%m/%y %H:%M:%S')
-    logger = logging.getLogger(__name__)
-    if not user:
-        new_user: User = await User.add_user(db_session=db_session,
-                                             subscription_until=subscription_until,
-                                             telegram_id=user_id,
-                                             first_name=firstname,
-                                             last_name=lastname,
-                                             username=username,
-                                             role=role,
-                                             is_botuser=True,
-                                             is_member=False
-                                             )
-        user: User = await User.get_user(db_session=db_session, telegram_id=user_id)
-        logger.info(f'новый пользователь {user.telegram_id}, {user.username}, {user.first_name} зарегестриован в базе')
-        logger.info(f'{user.__dict__}')
-
-    else:  # если такой пользователь уже найден - меняем ему статус is_member = true
-        updated_user: User = await user.update_user(db_session=db_session,
-                                                    role=role,
-                                                    is_botuser=True)
-        user: User = await User.get_user(db_session=db_session, telegram_id=user_id)
-        logger.info(f'роль пользователя {user.telegram_id}, {user.username}, {user.first_name} обновлена на User')
-        logger.info(f'{user.__dict__}')
-
-    if role == 'user':
-        await message.answer(
-                f'''Hello, {username} !
+    user: User = await user_add_or_update(message, role='user', module=__name__)
+    await message.answer(
+            f'''Hello, {user.username} !
 /menu - чтобы попасть в основное меню
 /help - Информация.
 ''')
-
-
-    if role == 'analytic':
-        if user.is_member == True:
-            await message.answer(
-                f"Hello, {username} ! \n Вы уже являетесь подписчиком канала. ")
-        else:
-            invite_link = await message.bot.create_chat_invite_link(chat_id=config.tg_bot.channel_id,
-                                                                    expire_date=timedelta(hours=1))
-            await message.answer(
-                f"Hello, {username} ! \n /predict, чтобы создать прогноз\n Ваша ссылка для входа в канал: {invite_link.invite_link}")
-
-    if role == 'admin':
-        if user.is_member == True:
-            await message.answer(
-                f"Hello, {username}-admin ! \n Вы уже являетесь подписчиком канала.")
-        else:
-            invite_link = await message.bot.create_chat_invite_link(chat_id=config.tg_bot.channel_id,
-                                                                    expire_date=timedelta(hours=1))
-            await message.answer(
-                f"Hello, {username}-admin ! \n Если забыл как войти - то вот: {invite_link.invite_link}")
 
 
 async def my_chat_member_update(my_chat_member: ChatMemberUpdated):
@@ -253,23 +183,6 @@ async def my_chat_member_update(my_chat_member: ChatMemberUpdated):
                 f'пользователь переподключеил бота {user.telegram_id}, {user.username}, {user.first_name}\n роль пользователя в базе на {role}')
             logger.info(f'{user.__dict__}')
 
-        print(f'ВРЕМЯ СЕЙЧАС {datetime.utcnow()}')
-
-
-    # elif status == 'left':
-    #     print(f'пользователь {user_id} покинул в канал')
-    #     user: User = await User.get_user(db_session=db_session,
-    #                                      telegram_id=user_id)
-    #     if not user:
-    #         pass
-    #     else:
-    #         updated_user: User = await user.update_user(db_session=db_session,
-    #                                                     is_member=False,
-    #                                                     role=role)
-    #         updated_user: User = await User.get_user(db_session=db_session, telegram_id=user_id)
-    #         print(updated_user)
-    #         print(type(updated_user))
-    #         pprint.pprint(updated_user)
     elif status == 'kicked':
         user_id = my_chat_member.chat.id
         print(f'пользователь {user_id} был kicked')
