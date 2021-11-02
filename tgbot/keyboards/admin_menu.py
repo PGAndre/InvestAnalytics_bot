@@ -31,7 +31,7 @@ def main_menu_message():
 
 
 def first_menu_message():
-    return 'Здесь вы можете управлять прогнозами:'
+    return 'Здесь вы можете управлять аналитиками:'
 
 
 def second_menu_message():
