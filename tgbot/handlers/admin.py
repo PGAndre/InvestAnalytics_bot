@@ -9,6 +9,7 @@ from tgbot.keyboards import reply
 from tgbot.keyboards.admin_menu import *
 
 from tgbot.keyboards.admin_menu import main_menu_message
+from tgbot.keyboards.callback_datas import list_analytic_callback
 from tgbot.misc.misc import user_add_or_update
 from tgbot.models.analytic import Prediction, Analytic
 from tgbot.models.users import User
@@ -124,6 +125,84 @@ Telegram ID: {analytic_id}
     await state.finish()
 
 
+async def list_analytics(query: CallbackQuery):
+    user: User = await user_add_or_update(query, role='admin', module=__name__)
+    await query.answer()
+    config = query.bot.get('config')
+    db_session = query.bot.get('db')
+    active_analytics: list[Analytic] = await Analytic.get_analytics(db_session=db_session, active=True)
+    inactive_analytics: list[Analytic] = await Analytic.get_analytics(db_session=db_session, active=False)
+    markup= InlineKeyboardMarkup(row_width=5)
+    for analytic in active_analytics:
+        button_text = f'{analytic.Nickname}:{analytic.rating}:active'
+        callback_data = list_analytic_callback.new(id=analytic.telegram_id, is_active=True, action='list')
+        markup.insert(
+            InlineKeyboardButton(text=button_text, callback_data=callback_data)
+        )
+    markup.row()
+    for analytic in inactive_analytics:
+        button_text = f'{analytic.Nickname}:{analytic.rating}:Inactive'
+        callback_data = list_analytic_callback.new(id=analytic.telegram_id, is_active=False, action='list')
+        markup.insert(
+            InlineKeyboardButton(text=button_text, callback_data=callback_data)
+        )
+    markup.row(
+        InlineKeyboardButton('Main menu', callback_data=admin_callback.new(action='main'))
+    )
+    await query.message.edit_text(text='Список аналитиков:', reply_markup=markup)
+
+async def choose_analytic(query: CallbackQuery, callback_data: dict):
+    db_session = query.bot.get('db')
+    logger=logging.getLogger(__name__)
+    await query.answer()
+    analytic_id=int(callback_data.get('id'))
+    is_active = callback_data.get('is_active')
+    analytic: Analytic = await Analytic.get_analytic_by_id(db_session=db_session, telegram_id=analytic_id)
+    if analytic.is_active == True:
+        status='Активный'
+    else:
+        status='Отключен'
+    text = f'''
+            Имя: {analytic.Nickname}
+id: {analytic.telegram_id}
+Рейтинг: {analytic.rating}
+Всего прогнозов: {analytic.predicts_total}
+Статус: {status}
+'''
+
+    markup = InlineKeyboardMarkup(row_width=5)
+    if is_active == 'True':
+        button_text = f'Отключить Аналитика {analytic.Nickname}'
+        callback_data = list_analytic_callback.new(id=analytic.telegram_id, is_active=True, action='act_deact')
+        markup.add(
+            InlineKeyboardButton(text=button_text, callback_data=callback_data)
+        )
+    else:
+        button_text = f'Активировать Аналитика {analytic.Nickname}'
+        callback_data = list_analytic_callback.new(id=analytic.telegram_id, is_active=False, action='act_deact')
+        markup.add(
+            InlineKeyboardButton(text=button_text, callback_data=callback_data)
+        )
+
+    markup.add(
+        InlineKeyboardButton('Main menu', callback_data=admin_callback.new(action='main'))
+    )
+
+    await query.message.edit_text(text=text, reply_markup=markup)
+
+async def act_deact_analytic(query: CallbackQuery, callback_data: dict):
+    db_session = query.bot.get('db')
+    logger=logging.getLogger(__name__)
+    await query.answer()
+    analytic_id=int(callback_data.get('id'))
+    activate = not eval(callback_data.get('is_active'))
+    analytic: Analytic = await Analytic.get_analytic_by_id(db_session=db_session, telegram_id=analytic_id)
+    analytic: Analytic = await analytic.update_analytic(db_session=db_session, is_active=activate)
+    query.data=admin_callback.new(action='analytic_3')
+    await list_analytics(query)
+
+
+
 
 
 async def admin_start(message: Message):
@@ -169,6 +248,9 @@ def register_admin(dp: Dispatcher):
     dp.register_callback_query_handler(main_menu, admin_callback.filter(action='main'), is_admin=True, state="*")
     dp.register_callback_query_handler(first_menu, admin_callback.filter(action='analytic'), is_admin=True, state="*")
     dp.register_callback_query_handler(add_analytic_button, admin_callback.filter(action='analytic_1'), is_admin=True, state="*")
+    dp.register_callback_query_handler(list_analytics, admin_callback.filter(action='analytic_3'), is_admin=True, state="*")
+    dp.register_callback_query_handler(choose_analytic, list_analytic_callback.filter(action='list'), is_admin=True, state="*")
+    dp.register_callback_query_handler(act_deact_analytic, list_analytic_callback.filter(action='act_deact'), is_admin=True, state="*")
     dp.register_message_handler(menu, commands=["menu"], state="*", is_admin=True)
     dp.register_message_handler(admin_start, commands=["start"], state="*", is_admin=True)
     dp.register_message_handler(cancel, text="отменить", state=[Analytics.Check_Analytic, Analytics.Set_Nickname, Analytics.Publish])

@@ -113,6 +113,9 @@ async def user_help(message: Message):
         return
     await message.answer(
             f'''Общая информация !
+Данный телеграм бот пренадлежит
+Пряхину Андрею Геннадьевичу. По всем вопросам просьба 
+обращаться по адресу apryahin@gmail.com            
    ''')
 
 async def user_start(message: Message):
