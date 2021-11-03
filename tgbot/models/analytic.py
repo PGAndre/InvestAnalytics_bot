@@ -28,9 +28,9 @@ class Analytic(Base):
 
 
     @classmethod
-    async def get_active_analytics(cls, db_session:sessionmaker):
+    async def get_analytics(cls, db_session:sessionmaker, active:bool):
         async with db_session() as db_session:
-            sql = select(cls).where(cls.is_active == True)
+            sql = select(cls).where(cls.is_active == active)
             request = await db_session.execute(sql)
             analytic: cls = request.scalars()
             return analytic
@@ -78,7 +78,12 @@ class Analytic(Base):
         rounded_rating = round(new_rating,2)
         return rounded_rating
 
-
+    async def update_analytic(self, db_session: sessionmaker, **updated_fields: dict) -> 'Analytic':
+        async with db_session() as db_session:
+            sql = update(Analytic).where(Analytic.telegram_id == self.telegram_id).values(**updated_fields).returning('*')
+            result = await db_session.execute(sql)
+            await db_session.commit()
+            return result.first()
 
 
 

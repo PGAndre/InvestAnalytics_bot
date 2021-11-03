@@ -18,7 +18,7 @@ class AnalyticFilter(BoundFilter):
             return True
         config: Config = obj.bot.get('config')
         db_session = await create_db_session(config)
-        analytics = await Analytic.get_active_analytics(db_session=db_session)
+        analytics = await Analytic.get_analytics(db_session=db_session, active=True)
         listof_analytics = []
         for analytic in analytics:
             listof_analytics.append(analytic.telegram_id)
