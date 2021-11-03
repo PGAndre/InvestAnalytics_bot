@@ -1,10 +1,11 @@
 import logging
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from aiogram import Dispatcher
 from aiogram.dispatcher import FSMContext
 from aiogram.types import Message, CallbackQuery, ReplyKeyboardRemove
 
+from tgbot.handlers.botuser import myinfo
 from tgbot.keyboards import reply
 from tgbot.keyboards.admin_menu import *
 
@@ -202,6 +203,30 @@ async def act_deact_analytic(query: CallbackQuery, callback_data: dict):
     await list_analytics(query)
 
 
+async def get_invitelink(query: CallbackQuery):
+    user: User = await user_add_or_update(query, role='admin', module=__name__)
+    # если пишут в другой чат, а не боту.
+    if query.message.chat.id != query.from_user.id:
+        return
+    await query.answer()
+    config = query.bot.get('config')
+    db_session = query.bot.get('db')
+    user_id = query.from_user.id
+    firstname = query.from_user.first_name
+    username = query.from_user.username
+    lastname = query.from_user.last_name
+    logger = logging.getLogger(__name__)
+
+    if user.is_member == True:
+        await query.message.answer(
+            f"Hello, {username} ! \n Вы уже являетесь подписчиком канала. ")
+    else:
+        invite_link = await query.bot.create_chat_invite_link(chat_id=config.tg_bot.channel_id,
+                                                                expire_date=timedelta(hours=1))
+        await query.message.answer(
+            f"Hello, {username}, Admin ! \nВаша ссылка для входа в канал: {invite_link.invite_link}")
+
+
 
 
 
@@ -248,9 +273,11 @@ def register_admin(dp: Dispatcher):
     dp.register_callback_query_handler(main_menu, admin_callback.filter(action='main'), is_admin=True, state="*")
     dp.register_callback_query_handler(first_menu, admin_callback.filter(action='analytic'), is_admin=True, state="*")
     dp.register_callback_query_handler(add_analytic_button, admin_callback.filter(action='analytic_1'), is_admin=True, state="*")
-    dp.register_callback_query_handler(list_analytics, admin_callback.filter(action='analytic_3'), is_admin=True, state="*")
+    dp.register_callback_query_handler(list_analytics, admin_callback.filter(action='analytic_2'), is_admin=True, state="*")
     dp.register_callback_query_handler(choose_analytic, list_analytic_callback.filter(action='list'), is_admin=True, state="*")
     dp.register_callback_query_handler(act_deact_analytic, list_analytic_callback.filter(action='act_deact'), is_admin=True, state="*")
+    dp.register_callback_query_handler(myinfo, admin_callback.filter(action='myinfo'), state="*")
+    dp.register_callback_query_handler(get_invitelink, admin_callback.filter(action='link'), is_admin=True, state="*")
     dp.register_message_handler(menu, commands=["menu"], state="*", is_admin=True)
     dp.register_message_handler(admin_start, commands=["start"], state="*", is_admin=True)
     dp.register_message_handler(cancel, text="отменить", state=[Analytics.Check_Analytic, Analytics.Set_Nickname, Analytics.Publish])

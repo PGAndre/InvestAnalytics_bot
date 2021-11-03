@@ -49,7 +49,7 @@ async def chat_member_update(chat_member: ChatMemberUpdated):
     # print("The type of the date is now", type(subscription_until))
     # print("The date is", subscription_until)
 
-    if status == 'member':
+    if status == 'member' or status == 'creator':
         user: User = await User.get_user(db_session=db_session,
                                          telegram_id=user_id)
         if not user:

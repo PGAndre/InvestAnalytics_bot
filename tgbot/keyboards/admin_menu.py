@@ -13,8 +13,7 @@ def main_menu_keyboard():
 
 def first_menu_keyboard():
     keyboard = [[InlineKeyboardButton('добавить аналитика', callback_data=admin_callback.new(action='analytic_1'))],
-                [InlineKeyboardButton('список активных аналитиков', callback_data=admin_callback.new(action='analytic_2'))],
-                [InlineKeyboardButton('список всех аналитиков', callback_data=admin_callback.new(action='analytic_3'))],
+                [InlineKeyboardButton('список всех аналитиков', callback_data=admin_callback.new(action='analytic_2'))],
                 [InlineKeyboardButton('Main menu', callback_data=admin_callback.new(action='main'))]]
     return InlineKeyboardMarkup(inline_keyboard=keyboard)
 
