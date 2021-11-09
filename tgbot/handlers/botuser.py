@@ -3,15 +3,19 @@ import pprint
 from datetime import datetime, timedelta
 
 from aiogram import Dispatcher
-from aiogram.types import Message, InlineKeyboardButton, InlineKeyboardMarkup, CallbackQuery, callback_query
+from aiogram.types import Message, InlineKeyboardButton, InlineKeyboardMarkup, CallbackQuery, callback_query, \
+    PreCheckoutQuery, SuccessfulPayment, ContentType
 from aiogram.types import ChatMemberUpdated
 from aiogram.utils.callback_data import CallbackData
 
+from tgbot.config import load_config, Config
+from tgbot.filters.botfilters import from_user_chat
 from tgbot.handlers import user
 from tgbot.keyboards.callback_datas import user_callback
 from tgbot.keyboards.user_menu import *
 from tgbot.misc import misc
 from tgbot.misc.misc import user_add_or_update
+from tgbot.misc.subscriptions import *
 from tgbot.models.users import User
 
 
@@ -78,11 +82,37 @@ async def subscription_info(query: CallbackQuery):
     else:
         await query.message.answer(text=f'Ваша подписка истекает {subscription_until.date():%d-%m-%Y}')
 
+
+async def subscription_edit(query: CallbackQuery):
+    await query.bot.send_invoice(query.from_user.id,
+                                 **Ykassa_1month.generate_invoice(),
+                                 payload="1monthYkassa")
+    await query.bot.send_invoice(query.from_user.id,
+                                 **Ykassa_2month.generate_invoice(),
+                                 payload="2monthYkassa")
+    await query.bot.send_invoice(query.from_user.id,
+                                 **Ykassa_3month.generate_invoice(),
+                                 payload="3monthYkassa")
+    #await query.answer()
+
+async def process_pre_checkout_query(query: PreCheckoutQuery):
+    await query.bot.send_message(chat_id=query.from_user.id, text="Спасибо за подписку!")
+    answer = await query.bot.answer_pre_checkout_query(pre_checkout_query_id=query.id, ok=True)
+    print(answer)
+
+async def process_success_payment(query: SuccessfulPayment):
+    print(query)
+    print(query.__dict__)
+
+async def successful_payment(message: Message):
+    print(message)
+    print(message.__dict__)
+
+
 async def get_invitelink(query: CallbackQuery):
     user: User = await user_add_or_update(query, role='user', module=__name__)
     # если пишут в другой чат, а не боту.
-    if query.message.chat.id != query.from_user.id:
-        return
+
     await query.answer()
     config = query.bot.get('config')
     db_session = query.bot.get('db')
@@ -109,8 +139,6 @@ async def get_invitelink(query: CallbackQuery):
 
 async def user_help(message: Message):
     user: User = await user_add_or_update(message, role='user', module=__name__)
-    if message.chat.id != message.from_user.id:
-        return
     await message.answer(
             f'''Общая информация !
 Данный телеграм бот пренадлежит
@@ -211,12 +239,14 @@ async def my_chat_member_update(my_chat_member: ChatMemberUpdated):
 
 
 def register_botuser(dp: Dispatcher):
-    dp.register_callback_query_handler(first_menu, user_callback.filter(action='sub'))
-    dp.register_callback_query_handler(subscription_info, user_callback.filter(action='sub_1'))
-    dp.register_callback_query_handler(get_invitelink, user_callback.filter(action='link'))
-    dp.register_callback_query_handler(main_menu, user_callback.filter(action='main'))
-    dp.register_callback_query_handler(myinfo, user_callback.filter(action='myinfo'))
-    dp.register_message_handler(menu, commands=["menu"], state="*")
+    dp.register_pre_checkout_query_handler(process_pre_checkout_query)
+    dp.register_callback_query_handler(first_menu, user_callback.filter(action='sub'), chat_type="private")
+    dp.register_callback_query_handler(subscription_info, user_callback.filter(action='sub_1'), chat_type="private")
+    dp.register_callback_query_handler(subscription_edit, user_callback.filter(action='sub_2'), chat_type="private")
+    dp.register_callback_query_handler(get_invitelink, user_callback.filter(action='link'), chat_type="private")
+    dp.register_callback_query_handler(main_menu, user_callback.filter(action='main'), chat_type="private")
+    dp.register_callback_query_handler(myinfo, user_callback.filter(action='myinfo'), chat_type="private")
+    dp.register_message_handler(menu, commands=["menu"], state="*", chat_type="private")
 
     # updater.dispatcher.add_handler(CallbackQueryHandler(main_menu, pattern='main'))
     # updater.dispatcher.add_handler(CallbackQueryHandler(first_menu, pattern='m1'))
@@ -227,5 +257,6 @@ def register_botuser(dp: Dispatcher):
     #                                                     pattern='m2_1'))
 
     dp.register_my_chat_member_handler(my_chat_member_update)
-    dp.register_message_handler(user_start, commands=["start"], state="*")
-    dp.register_message_handler(user_help, commands=["help"], state="*")
+    dp.register_message_handler(user_start, commands=["start"], state="*", chat_type="private")
+    dp.register_message_handler(user_help, commands=["help"], state="*", chat_type="private")
+    dp.register_message_handler(successful_payment, content_types = ContentType.SUCCESSFUL_PAYMENT)

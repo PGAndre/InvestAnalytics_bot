@@ -206,8 +206,6 @@ async def act_deact_analytic(query: CallbackQuery, callback_data: dict):
 async def get_invitelink(query: CallbackQuery):
     user: User = await user_add_or_update(query, role='admin', module=__name__)
     # если пишут в другой чат, а не боту.
-    if query.message.chat.id != query.from_user.id:
-        return
     await query.answer()
     config = query.bot.get('config')
     db_session = query.bot.get('db')
@@ -269,20 +267,20 @@ async def second_menu(query: CallbackQuery):
 
 
 def register_admin(dp: Dispatcher):
-    dp.register_callback_query_handler(main_menu, analytic_callback.filter(action='main'), is_admin=True, state="*")
-    dp.register_callback_query_handler(main_menu, admin_callback.filter(action='main'), is_admin=True, state="*")
-    dp.register_callback_query_handler(first_menu, admin_callback.filter(action='analytic'), is_admin=True, state="*")
-    dp.register_callback_query_handler(add_analytic_button, admin_callback.filter(action='analytic_1'), is_admin=True, state="*")
-    dp.register_callback_query_handler(list_analytics, admin_callback.filter(action='analytic_2'), is_admin=True, state="*")
-    dp.register_callback_query_handler(choose_analytic, list_analytic_callback.filter(action='list'), is_admin=True, state="*")
-    dp.register_callback_query_handler(act_deact_analytic, list_analytic_callback.filter(action='act_deact'), is_admin=True, state="*")
-    dp.register_callback_query_handler(myinfo, admin_callback.filter(action='myinfo'), state="*")
-    dp.register_callback_query_handler(get_invitelink, admin_callback.filter(action='link'), is_admin=True, state="*")
-    dp.register_message_handler(menu, commands=["menu"], state="*", is_admin=True)
-    dp.register_message_handler(admin_start, commands=["start"], state="*", is_admin=True)
+    dp.register_callback_query_handler(main_menu, analytic_callback.filter(action='main'), is_admin=True, state="*", chat_type="private")
+    dp.register_callback_query_handler(main_menu, admin_callback.filter(action='main'), is_admin=True, state="*", chat_type="private")
+    dp.register_callback_query_handler(first_menu, admin_callback.filter(action='analytic'), is_admin=True, state="*", chat_type="private")
+    dp.register_callback_query_handler(add_analytic_button, admin_callback.filter(action='analytic_1'), is_admin=True, state="*", chat_type="private")
+    dp.register_callback_query_handler(list_analytics, admin_callback.filter(action='analytic_2'), is_admin=True, state="*", chat_type="private")
+    dp.register_callback_query_handler(choose_analytic, list_analytic_callback.filter(action='list'), is_admin=True, state="*", chat_type="private")
+    dp.register_callback_query_handler(act_deact_analytic, list_analytic_callback.filter(action='act_deact'), is_admin=True, state="*", chat_type="private")
+    dp.register_callback_query_handler(myinfo, admin_callback.filter(action='myinfo'), state="*", chat_type="private")
+    dp.register_callback_query_handler(get_invitelink, admin_callback.filter(action='link'), is_admin=True, state="*", chat_type="private")
+    dp.register_message_handler(menu, commands=["menu"], state="*", is_admin=True, chat_type="private")
+    dp.register_message_handler(admin_start, commands=["start"], state="*", is_admin=True, chat_type="private")
     dp.register_message_handler(cancel, text="отменить", state=[Analytics.Check_Analytic, Analytics.Set_Nickname, Analytics.Publish])
     dp.register_message_handler(back_to, text="назад", state=[Analytics.Check_Analytic, Analytics.Set_Nickname, Analytics.Publish])
-    dp.register_message_handler(add_analytic, text="/analytic", state='*', is_admin=True)
+    dp.register_message_handler(add_analytic, text="/analytic", state='*', is_admin=True, chat_type="private")
     dp.register_message_handler(set_nickname, state=Analytics.Set_Nickname)
     dp.register_message_handler(check_analytic, state=Analytics.Check_Analytic)
     dp.register_message_handler(publish, text="опубликовать", state=Analytics.Publish)

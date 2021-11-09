@@ -21,15 +21,17 @@ class TestMode:
 @dataclass
 class TgBot:
     token: str
-    admin_ids: int
+    admin_ids: list[int]
     analytic_ids: list[int]
     use_redis: bool
     channel_id: int
+    flood_channel_id: int
 
 
 @dataclass
 class Miscellaneous:
     tcs_token: str
+    ykassa_token: str
 
 
 @dataclass
@@ -56,7 +58,8 @@ def load_config(path: str = None):
             admin_ids=list(map(int, env.list("ADMINS"))),
             analytic_ids=list(map(int, env.list("ANALYTICS"))),
             use_redis=env.bool("USE_REDIS"),
-            channel_id=env.int("CHANNEL_ID")
+            channel_id=env.int("CHANNEL_ID"),
+            flood_channel_id=env.int("FLOOD_CHANNEL_ID")
         ),
         db=DbConfig(
             host=env.str('DB_HOST'),
@@ -65,6 +68,7 @@ def load_config(path: str = None):
             database=env.str('DB_NAME')
         ),
         misc=Miscellaneous(
-            tcs_token=env.str('TCS_TOKEN')
+            tcs_token=env.str('TCS_TOKEN'),
+            ykassa_token=env.str('YKASSA_TOKEN')
         )
     )

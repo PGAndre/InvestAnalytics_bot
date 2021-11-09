@@ -61,8 +61,6 @@ async def analytic_start(message: Message):
 async def get_invitelink(query: CallbackQuery):
     user: User = await user_add_or_update(query, role='analytic', module=__name__)
     # если пишут в другой чат, а не боту.
-    if query.message.chat.id != query.from_user.id:
-        return
     await query.answer()
     config = query.bot.get('config')
     db_session = query.bot.get('db')
@@ -347,16 +345,15 @@ Rating: {analytic_rating}'''
 
 
 def register_analytic(dp: Dispatcher):
-    dp.register_callback_query_handler(first_menu, analytic_callback.filter(action='pred'), is_analytic=True, state="*")
-    dp.register_callback_query_handler(make_predict_button, analytic_callback.filter(action='pred_1'), is_analytic=True, state="*")
-    dp.register_callback_query_handler(get_invitelink, analytic_callback.filter(action='link'),  is_analytic=True, state="*")
-    dp.register_callback_query_handler(get_predict_list, analytic_callback.filter(action='pred_2'), is_analytic=True, state="*")
-    dp.register_callback_query_handler(main_menu, analytic_callback.filter(action='main'), is_analytic=True, state="*")
-    dp.register_callback_query_handler(myinfo, analytic_callback.filter(action='myinfo'), state="*")
-    dp.register_message_handler(menu, commands=["menu"], state="*", is_analytic=True)
-    dp.register_callback_query_handler(predict_info, predict_callback.filter(), is_analytic=True, state="*")
-
-    dp.register_message_handler(analytic_start, commands=["start"], state="*", is_analytic=True)
+    dp.register_callback_query_handler(first_menu, analytic_callback.filter(action='pred'), is_analytic=True, state="*", chat_type="private")
+    dp.register_callback_query_handler(make_predict_button, analytic_callback.filter(action='pred_1'), is_analytic=True, state="*", chat_type="private")
+    dp.register_callback_query_handler(get_invitelink, analytic_callback.filter(action='link'),  is_analytic=True, state="*", chat_type="private")
+    dp.register_callback_query_handler(get_predict_list, analytic_callback.filter(action='pred_2'), is_analytic=True, state="*", chat_type="private")
+    dp.register_callback_query_handler(main_menu, analytic_callback.filter(action='main'), is_analytic=True, state="*", chat_type="private")
+    dp.register_callback_query_handler(myinfo, analytic_callback.filter(action='myinfo'), state="*", chat_type="private")
+    dp.register_message_handler(menu, commands=["menu"], state="*", is_analytic=True, chat_type="private")
+    dp.register_callback_query_handler(predict_info, predict_callback.filter(), is_analytic=True, state="*", chat_type="private")
+    dp.register_message_handler(analytic_start, commands=["start"], state="*", is_analytic=True, chat_type="private")
     dp.register_message_handler(cancel, text="отменить",
                                 state=[Predict.Check_Ticker, Predict.Set_Date, Predict.Confirm, Predict.Publish])
     dp.register_message_handler(back_to, text="назад", state=[Predict.Set_Date, Predict.Confirm, Predict.Publish])

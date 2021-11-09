@@ -81,7 +81,7 @@ async def main():
     scheduler.start()
     # start r4566
     try:
-        await dp.start_polling(allowed_updates=["message", "chat_member", "my_chat_member", "callback_query"])
+        await dp.start_polling(allowed_updates=["message", "chat_member", "my_chat_member", "callback_query", "pre_checkout_query", "successful_payment"])
     finally:
         await dp.storage.close()
         await dp.storage.wait_closed()

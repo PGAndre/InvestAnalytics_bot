@@ -5,6 +5,7 @@ from aiogram import Dispatcher
 from aiogram.types import Message
 from aiogram.types import ChatMemberUpdated
 
+from tgbot.filters.botfilters import flood_user_chat
 from tgbot.misc import misc
 from tgbot.models.users import User
 
@@ -20,4 +21,5 @@ async def myinfo(message: Message):
 
 
 def register_user(dp: Dispatcher):
-    dp.register_message_handler(myinfo,commands=["myinfo"], state="*")
+    dp.register_message_handler(myinfo, commands=["testinfo"], state="*")
+    dp.register_message_handler(myinfo, flood_user_chat, commands=["testinfo"], state="*")
