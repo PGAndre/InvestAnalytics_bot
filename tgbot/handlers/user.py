@@ -21,5 +21,5 @@ async def myinfo(message: Message):
 
 
 def register_user(dp: Dispatcher):
-    dp.register_message_handler(myinfo, commands=["testinfo"], state="*")
+    #dp.register_message_handler(myinfo, commands=["testinfo"], state="*")
     dp.register_message_handler(myinfo, flood_user_chat, commands=["testinfo"], state="*")

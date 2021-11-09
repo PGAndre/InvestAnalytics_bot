@@ -1,11 +1,11 @@
 import logging
-import pprint
 from datetime import datetime, timedelta
 
 from aiogram import Dispatcher
 from aiogram.types import Message
 from aiogram.types import ChatMemberUpdated
 
+from tgbot.filters.botfilters import *
 from tgbot.misc import misc
 from tgbot.models.users import User
 
@@ -13,13 +13,10 @@ from tgbot.models.users import User
 async def chat_member_update(chat_member: ChatMemberUpdated):
     logger=logging.getLogger(__name__)
     chat_member = chat_member
-    #print(f'{chat_member} новый мембер')
     config = chat_member.bot.get('config')
 
     db_session = chat_member.bot.get('db')
     #это надо реализовать фильтром
-    if chat_member.chat.id != config.tg_bot.channel_id:
-        return
     chat = chat_member.chat# если чат совпадает с чатом из конфига
     user_id = chat_member.from_user.id
     firstname = chat_member.from_user.first_name
@@ -46,8 +43,6 @@ async def chat_member_update(chat_member: ChatMemberUpdated):
 
     subscription_until = datetime.strptime(subscription_until_str, '%d/%m/%y %H:%M:%S')
 
-    # print("The type of the date is now", type(subscription_until))
-    # print("The date is", subscription_until)
 
     if status == 'member' or status == 'creator':
         user: User = await User.get_user(db_session=db_session,
@@ -92,7 +87,6 @@ async def chat_member_update(chat_member: ChatMemberUpdated):
 
 
     elif status == 'left':
-        #print(f'пользователь {user_id} покинул в канал')
         user: User = await User.get_user(db_session=db_session,
                                          telegram_id=user_id)
         if not user:
@@ -119,6 +113,39 @@ async def chat_member_update(chat_member: ChatMemberUpdated):
             logger.info(user.__dict__)
 
 
+async def group_member_update(chat_member: ChatMemberUpdated):
+    logger=logging.getLogger(__name__)
+    chat_member = chat_member
+    config = chat_member.bot.get('config')
+    chat = chat_member.chat# если чат совпадает с чатом из конфига
+    user_id = chat_member.from_user.id
+    status = chat_member.new_chat_member.values['status']
+    role = 'user'
+    admins = config.tg_bot.admin_ids
+    isAnalytic = await misc.check(chat_member)
+    if isAnalytic:
+        role = 'analytic'
+    isadmin = user_id in admins
+    if isadmin:
+        role = 'admin'
+
+    if role == 'analytic' or role == 'admin':
+        return
+    if status == 'member' or status == 'creator':
+
+        kicked = await chat.kick(user_id, until_date=timedelta(seconds=31))
+
+        logger.info(f'пользователь {chat_member.from_user.id} {chat_member.from_user.username} попытался войти в \nприватную группу {chat_member.chat.id} {chat_member.chat.title} привязанную каналу и будет кикнут')
+
+
+    elif status == 'left':
+        pass
+    elif status == 'kicked':
+       logger.info(f'пользователь {chat_member.from_user.id} {chat_member.from_user.username} был кикнут \nиз группы {chat_member.chat.id} {chat_member.chat.title} привязанную каналу ')
+
+
+
 
 def register_channeluser(dp: Dispatcher):
-    dp.register_chat_member_handler(chat_member_update)
+    dp.register_chat_member_handler(group_member_update, group_chat_member)
+    dp.register_chat_member_handler(chat_member_update, channel_chat_member)

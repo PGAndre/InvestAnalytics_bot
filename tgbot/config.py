@@ -25,6 +25,7 @@ class TgBot:
     analytic_ids: list[int]
     use_redis: bool
     channel_id: int
+    group_id: int
     flood_channel_id: int
 
 
@@ -59,6 +60,7 @@ def load_config(path: str = None):
             analytic_ids=list(map(int, env.list("ANALYTICS"))),
             use_redis=env.bool("USE_REDIS"),
             channel_id=env.int("CHANNEL_ID"),
+            group_id=env.int("GROUP_ID"),
             flood_channel_id=env.int("FLOOD_CHANNEL_ID")
         ),
         db=DbConfig(
