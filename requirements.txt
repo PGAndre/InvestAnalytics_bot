@@ -9,3 +9,4 @@ tinvest
 apscheduler
 faker
 pandas-market-calendars
+numpy

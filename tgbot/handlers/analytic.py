@@ -105,6 +105,7 @@ async def get_predict_list(query: CallbackQuery):
 
 
 async def predict_info(query: CallbackQuery, callback_data: dict):
+    config = query.bot.get('config')
     db_session = query.bot.get('db')
     logger=logging.getLogger(__name__)
     await query.answer()
@@ -115,18 +116,32 @@ async def predict_info(query: CallbackQuery, callback_data: dict):
     name = predict.name
     start_value = predict.start_value
     currency = predict.currency
+    start_date = predict.start_date
     predicted_date = predict.predicted_date
     analytic_nickname = predict.analytic.Nickname
     analytic_rating = predict.analytic.rating
     target = predict.predicted_value
+    analytic_predicts_total=predict.analytic.predicts_total
+    instrument = await tinkoff.search_by_ticker(ticker, config)
+    latestcost = await tinkoff.get_latest_cost_history(figi=instrument['figi'], config=config,
+                                                       to_time=datetime.utcnow())
     text = f'''
-            ${ticker} ({name})
-Цена: {start_value} {currency} --> {target} {currency}
-Дата окончания:  {predicted_date.date()}
+                🏦${ticker} ({name})
+⏱Дата начала: {start_date.date():%d-%m-%Y}                 
+⏱Дата окончания:  {predicted_date.date():%d-%m-%Y}
+Прогноз: {start_value} {currency}➡{target} {currency}
+Цена сейчас: {latestcost} {currency}
 Аналитик: {analytic_nickname}
-Rating: {analytic_rating}'''
+Rating: {analytic_rating}
+Всего прогнозов: {analytic_predicts_total}'''
 
-    await query.message.answer(text=text)
+    await query.message.answer(text=text,
+                                   reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+                                       [
+                                           InlineKeyboardButton(text="Open in Tinkoff",
+                                                                url=f'https://www.tinkoff.ru/invest/stocks/{ticker}')
+                                       ],
+                                   ]))
 
 
 async def make_predict_button(query: CallbackQuery):
@@ -277,15 +292,24 @@ async def confirm(message: Message, state: FSMContext):
         data['target'] = target
         data['analytic_nickname'] = analytic.Nickname
         data['analytic_rating'] = analytic.rating
+        data['predicts_total'] = analytic.predicts_total
     ticker = data['ticker']
     predict_time = data['predict_time']
     predicted_date = await bdays.next_business_day(datetime.utcnow(), predict_time)
     target = data['target']
     name = data['name']
     currency = data['currency']
-    await message.answer(
-        f'Акця ${ticker} ({name}), {start_value} {currency} -----> {target} {currency} через {predict_time} торговых дней. ({predicted_date.date()})\n'
-        f'Аналитик: {analytic.Nickname}, rating: {analytic.rating}', reply_markup=reply.confirm)
+
+    text = f'''
+            🏦${ticker} ({name})
+⏱Дата окончания:  {predicted_date.date():%d-%m-%Y}
+Цена: {start_value} {currency}➡{target} {currency}
+Аналитик: {analytic.Nickname}
+Rating: {analytic.rating}
+Всего прогнозов: {analytic.predicts_total}'''
+
+
+    await message.answer(text=text, reply_markup=reply.confirm)
     await Predict.Publish.set()
 
 
@@ -301,6 +325,7 @@ async def publish(message: Message, state: FSMContext):
         figi = data['figi']
         analytic_nickname = data['analytic_nickname']
         analytic_rating = data['analytic_rating']
+        analytic_predicts_total = data['predicts_total']
         predicted_date = await bdays.next_business_day(datetime.utcnow(), predict_time)
     db_session = message.bot.get('db')
     prediction: Prediction = await Prediction.add_predict(db_session=db_session,
@@ -312,18 +337,13 @@ async def publish(message: Message, state: FSMContext):
                                                           start_value=start_value,
                                                           predicted_value=target,
                                                           analytic_id=message.from_user.id)
-    days = 'дней'
-    if predict_time == 1:
-        days = 'день'
-    elif predict_time in [2, 3, 4]:
-        days = 'дня'
-
     text = f'''
-        ${ticker} ({name})
-Цена: {start_value} {currency} --> {target} {currency}
-Дата окончания:  {predicted_date.date()}
+        🏦${ticker} ({name})
+⏱Дата окончания:  {predicted_date.date():%d-%m-%Y}
+Цена: {start_value} {currency}➡{target} {currency}
 Аналитик: {analytic_nickname}
-Rating: {analytic_rating}'''
+Rating: {analytic_rating}
+Всего прогнозов: {analytic_predicts_total}'''
     logger = logging.getLogger(__name__)
 
     await message.answer(text=text,

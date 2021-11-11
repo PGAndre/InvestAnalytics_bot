@@ -157,15 +157,18 @@ async def predictions_active_finished():
         rating_delta = updated_analytic.rating - analytic.rating
         print(f' Аалитик: новое: {updated_analytic}, {updated_analytic.__dict__}')
         if prediction.successful:
-            text = f'''Прогноз по акции {updated_prediction.ticker} сбылся {updated_prediction.end_date.date()}. 
-${updated_prediction.ticker}: {updated_prediction.start_value} {updated_prediction.currency} --> {updated_prediction.end_value} {updated_prediction.currency}
+            text = f'''🚀Прогноз по акции {updated_prediction.ticker} сбылся ⏱{updated_prediction.end_date.date():%d-%m-%Y}. 
+🏦Прогноз:${updated_prediction.ticker}: {updated_prediction.start_value} {updated_prediction.currency}➡{updated_prediction.end_value} {updated_prediction.currency}
 Рейтинг Прогноза {updated_prediction.rating}
-Рейтинг аналитика {analytic.Nickname}: {analytic.rating} --> {updated_analytic.rating} .'''
+Рейтинг аналитика {analytic.Nickname}: {analytic.rating}➡{updated_analytic.rating}
+Всего прогнозов: {analytic.predicts_total}.'''
         else:
-            text = f'''Прогноз по акции {updated_prediction.ticker}  не сбылся . 
-${updated_prediction.ticker}: {updated_prediction.start_value} {updated_prediction.currency} --> {updated_prediction.end_value} {updated_prediction.currency}
-Рейтинг Прогноза {updated_prediction.rating}
-Рейтинг аналитика {analytic.Nickname}: {analytic.rating} --> {updated_analytic.rating} .'''
+            text = f'''🚫Прогноз по акции {updated_prediction.ticker}  не сбылся . 
+🏦Прогноз:${updated_prediction.ticker}: {updated_prediction.start_value} {updated_prediction.currency}➡{updated_prediction.predicted_value} {updated_prediction.currency}
+Фактическое изменение: ${updated_prediction.ticker}: {updated_prediction.start_value} {updated_prediction.currency}➡{updated_prediction.end_value} {updated_prediction.currency}
+Рейтинг прогноза {updated_prediction.rating}
+Рейтинг аналитика {analytic.Nickname}: {analytic.rating}➡{updated_analytic.rating}
+Всего прогнозов: {analytic.predicts_total}.'''
 
         await bot.send_message(chat_id=channel_id,
                                text=text)

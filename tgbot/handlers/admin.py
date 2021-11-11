@@ -192,13 +192,22 @@ id: {analytic.telegram_id}
     await query.message.edit_text(text=text, reply_markup=markup)
 
 async def act_deact_analytic(query: CallbackQuery, callback_data: dict):
+    config = query.bot.get('config')
+    admins = config.tg_bot.admin_ids
     db_session = query.bot.get('db')
     logger=logging.getLogger(__name__)
     await query.answer()
     analytic_id=int(callback_data.get('id'))
+    isadmin = analytic_id in admins
     activate = not eval(callback_data.get('is_active'))
     analytic: Analytic = await Analytic.get_analytic_by_id(db_session=db_session, telegram_id=analytic_id)
     analytic: Analytic = await analytic.update_analytic(db_session=db_session, is_active=activate)
+    if activate == False and not isadmin:
+        user: User = await User.get_user(db_session=db_session, telegram_id=analytic_id)
+        user: User = await user.update_user(db_session=db_session, role='user')
+    elif activate == True and not isadmin:
+        user: User = await User.get_user(db_session=db_session, telegram_id=analytic_id)
+        user: User = await user.update_user(db_session=db_session, role='analytic')
     query.data=admin_callback.new(action='analytic_3')
     await list_analytics(query)
 

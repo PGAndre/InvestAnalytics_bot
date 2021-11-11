@@ -11,11 +11,12 @@ from aiogram.utils.callback_data import CallbackData
 from tgbot.config import load_config, Config
 from tgbot.filters.botfilters import from_user_chat
 from tgbot.handlers import user
-from tgbot.keyboards.callback_datas import user_callback
+from tgbot.keyboards.callback_datas import user_callback, user_predict_callback
 from tgbot.keyboards.user_menu import *
-from tgbot.misc import misc
+from tgbot.misc import misc, tinkoff
 from tgbot.misc.misc import user_add_or_update
 from tgbot.misc.subscriptions import *
+from tgbot.models.analytic import Prediction
 from tgbot.models.users import User
 
 
@@ -68,6 +69,75 @@ async def myinfo(query: CallbackQuery):
     await query.answer()
     await query.message.answer(text=f'user_id: {user_id}\nusername: {username}')
 
+
+async def get_predict_list(query: CallbackQuery):
+    user: User = await user_add_or_update(query, role='user', module=__name__)
+    if user.subscription_until < datetime.utcnow():
+        await query.message.edit_text(
+            f"Hello, {user.username} ! \n Ваша подписка истекла. Обновите подписку для получения ссылки на канал.", reply_markup=first_menu_keyboard())
+        return
+    await query.answer()
+    config = query.bot.get('config')
+    db_session = query.bot.get('db')
+    logger=logging.getLogger(__name__)
+    # список всех предиктов is_active
+    predictions: list[Prediction] = await Prediction.get_active_predicts(db_session=db_session)
+    markup= InlineKeyboardMarkup(row_width=5)
+    for prediction in predictions:
+        button_text = f'${prediction.ticker}'
+        callback_data = user_predict_callback.new(ticker=prediction.ticker)
+        markup.insert(
+            InlineKeyboardButton(text=button_text, callback_data=callback_data)
+        )
+    markup.row(
+        InlineKeyboardButton('Main menu', callback_data=user_callback.new(action='main'))
+    )
+    await query.message.edit_text(text='Список активных прогнозов:', reply_markup=markup)
+
+
+async def predict_info(query: CallbackQuery, callback_data: dict):
+    user: User = await user_add_or_update(query, role='user', module=__name__)
+    if user.subscription_until < datetime.utcnow():
+        await query.message.edit_text(
+            f"Hello, {user.username} ! \n Ваша подписка истекла. Обновите подписку для получения ссылки на канал.", reply_markup=first_menu_keyboard())
+        return
+    config = query.bot.get('config')
+    db_session = query.bot.get('db')
+    logger=logging.getLogger(__name__)
+    await query.answer()
+    logger.info(f"{callback_data}")
+    ticker=callback_data.get('ticker')
+    logger.info(f'{ticker}')
+    predict = await Prediction.get_predict(db_session=db_session, ticker=ticker)
+    name = predict.name
+    start_value = predict.start_value
+    currency = predict.currency
+    start_date = predict.start_date
+    predicted_date = predict.predicted_date
+    analytic_nickname = predict.analytic.Nickname
+    analytic_rating = predict.analytic.rating
+    target = predict.predicted_value
+    analytic_predicts_total=predict.analytic.predicts_total
+    instrument = await tinkoff.search_by_ticker(ticker, config)
+    latestcost = await tinkoff.get_latest_cost_history(figi=instrument['figi'], config=config,
+                                                       to_time=datetime.utcnow())
+    text = f'''
+                🏦${ticker} ({name})
+⏱Дата начала: {start_date.date():%d-%m-%Y}                 
+⏱Дата окончания:  {predicted_date.date():%d-%m-%Y}
+Прогноз: {start_value} {currency}➡{target} {currency}
+Цена сейчас: {latestcost} {currency}
+Аналитик: {analytic_nickname}
+Rating: {analytic_rating}
+Всего прогнозов: {analytic_predicts_total}'''
+
+    await query.message.answer(text=text,
+                                   reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+                                       [
+                                           InlineKeyboardButton(text="Open in Tinkoff",
+                                                                url=f'https://www.tinkoff.ru/invest/stocks/{ticker}')
+                                       ],
+                                   ]))
 
 async def subscription_info(query: CallbackQuery):
     user: User = await user_add_or_update(query, role='user', module=__name__)
@@ -243,6 +313,8 @@ def register_botuser(dp: Dispatcher):
     dp.register_callback_query_handler(first_menu, user_callback.filter(action='sub'), chat_type="private")
     dp.register_callback_query_handler(subscription_info, user_callback.filter(action='sub_1'), chat_type="private")
     dp.register_callback_query_handler(subscription_edit, user_callback.filter(action='sub_2'), chat_type="private")
+    dp.register_callback_query_handler(get_predict_list, user_callback.filter(action='pred'), state="*", chat_type="private")
+    dp.register_callback_query_handler(predict_info, user_predict_callback.filter(), state="*", chat_type="private")
     dp.register_callback_query_handler(get_invitelink, user_callback.filter(action='link'), chat_type="private")
     dp.register_callback_query_handler(main_menu, user_callback.filter(action='main'), chat_type="private")
     dp.register_callback_query_handler(myinfo, user_callback.filter(action='myinfo'), chat_type="private")

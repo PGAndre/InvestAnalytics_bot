@@ -6,6 +6,7 @@ from aiogram import Bot
 from aiogram.utils.exceptions import BotBlocked
 
 from tgbot.config import load_config, Config
+from tgbot.keyboards.user_menu import first_menu_keyboard
 from tgbot.models.users import User
 from tgbot.services.database import create_db_session
 
@@ -28,7 +29,7 @@ async def kick_users():
         if user.is_botuser:
             try:
                 await bot.send_message(chat_id=user_id,
-                                       text=f'ваша подписка истекла. \nпройдите по ссылке для продления: ТУТ БУДЕТ КЛАВИАТУРА')
+                                       text=f'ваша подписка истекла. \nпройдите по ссылке для продления:', reply_markup=first_menu_keyboard())
                 logger.info(f'уведомление об исключчении из канала {channel_id} для {user._dict__}')
             except BotBlocked:
                 logger.exception(
@@ -57,7 +58,7 @@ async def notify_users_with_active_sub():
             user_id = user.telegram_id
             try:
                 await bot.send_message(chat_id=user_id,
-                                       text=f'ваша подписка истекает {user.subscription_until.date()}, для продления пройдите по ссылке ниже ююю ТУТ БУДЕТ КНОПКА')
+                                       text=f'ваша подписка истекает {user.subscription_until.date()}\nпройдите по ссылке для продления:', reply_markup=first_menu_keyboard())
                 logger.info(f'уведомление об истекающей подписке на канал {channel_id} для {user.__dict__}')
             except BotBlocked:
                 await user.update_user(db_session=db_session,
@@ -84,7 +85,7 @@ async def notify_users_with_inactive_sub():
             user_id = user.telegram_id
             try:
                 await bot.send_message(chat_id=user_id,
-                                       text=f'ваша подписка истекла , для продления пройдите по ссылке ниже ююю ТУТ БУДЕТ КНОПКА')
+                                       text=f'ваша подписка истекла. \nпройдите по ссылке для продления:', reply_markup=first_menu_keyboard())
                 logger.info(f'уведомление об истекшей подписке на канал {channel_id} для {user.__dict__}')
             except BotBlocked:
                 await user.update_user(db_session=db_session,
