@@ -19,6 +19,7 @@ from tgbot.services.db_base import Base
 class Analytic(Base):
     __tablename__ = 'Analytics'
     Nickname = Column(String(100))
+    description = Column(String(500), nullable=True)
     telegram_id = Column(BigInteger, primary_key=True, nullable=False)
     predicts_total = Column(Integer, default=0, nullable=False)
     rating = Column(Numeric(4, 2), default=50.00, nullable=False)

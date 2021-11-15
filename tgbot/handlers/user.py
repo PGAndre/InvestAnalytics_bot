@@ -9,6 +9,8 @@ from tgbot.filters.botfilters import flood_user_chat
 from tgbot.misc import misc
 from tgbot.models.users import User
 
+async def testflood(message: Message):
+    print(message.text)
 
 async def myinfo(message: Message):
     user_id=message.from_user.id
@@ -21,5 +23,6 @@ async def myinfo(message: Message):
 
 
 def register_user(dp: Dispatcher):
+    #dp.register_message_handler(testflood, state="*")
     #dp.register_message_handler(myinfo, commands=["testinfo"], state="*")
     dp.register_message_handler(myinfo, flood_user_chat, commands=["testinfo"], state="*")

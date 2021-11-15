@@ -133,7 +133,7 @@ async def list_analytics(query: CallbackQuery):
     db_session = query.bot.get('db')
     active_analytics: list[Analytic] = await Analytic.get_analytics(db_session=db_session, active=True)
     inactive_analytics: list[Analytic] = await Analytic.get_analytics(db_session=db_session, active=False)
-    markup= InlineKeyboardMarkup(row_width=5)
+    markup= InlineKeyboardMarkup(row_width=4)
     for analytic in active_analytics:
         button_text = f'{analytic.Nickname}:{analytic.rating}:active'
         callback_data = list_analytic_callback.new(id=analytic.telegram_id, is_active=True, action='list')

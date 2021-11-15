@@ -68,8 +68,11 @@ async def user_add_or_update(obj, role: str, module: str) -> User:
     else:
         if user.role == role:
             return user
+
         admins = config.tg_bot.admin_ids
         isadmin = user_id in admins
+        if user.role == 'tester' and not isadmin:
+            return user
         if user.role == 'admin' and isadmin:
             return user
         # если такой пользователь уже найден - меняем ему статус is_member = true

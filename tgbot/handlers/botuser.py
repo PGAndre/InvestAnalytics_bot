@@ -11,12 +11,12 @@ from aiogram.utils.callback_data import CallbackData
 from tgbot.config import load_config, Config
 from tgbot.filters.botfilters import from_user_chat
 from tgbot.handlers import user
-from tgbot.keyboards.callback_datas import user_callback, user_predict_callback
+from tgbot.keyboards.callback_datas import user_callback, user_predict_callback, user_list_analytic_callback
 from tgbot.keyboards.user_menu import *
 from tgbot.misc import misc, tinkoff
 from tgbot.misc.misc import user_add_or_update
 from tgbot.misc.subscriptions import *
-from tgbot.models.analytic import Prediction
+from tgbot.models.analytic import Prediction, Analytic
 from tgbot.models.users import User
 
 
@@ -26,16 +26,34 @@ from tgbot.models.users import User
 
 async def menu(message: Message):
     user: User = await user_add_or_update(message, role='user', module=__name__)
-    await message.answer(text=main_menu_message(),
-                         reply_markup=main_menu_keyboard())
+    config = message.bot.get('config')
+    free = config.test.free
+    if not free or user.role=='tester':
+        await message.answer(
+            text=main_menu_message(),
+            reply_markup=main_menu_keyboard())
+    else:
+        await message.answer(
+            text=main_menu_message(),
+            reply_markup=main_menu_keyboard_test())
+
 
 
 async def main_menu(query: CallbackQuery):
     user: User = await user_add_or_update(query, role='user', module=__name__)
     await query.answer()
-    await query.message.edit_text(
-        text=main_menu_message(),
-        reply_markup=main_menu_keyboard())
+    config = query.bot.get('config')
+    free = config.test.free
+
+    if not free or user.role=='tester':
+        await query.message.edit_text(
+            text=main_menu_message(),
+            reply_markup=main_menu_keyboard())
+    else:
+        await query.message.edit_text(
+            text=main_menu_message(),
+            reply_markup=main_menu_keyboard_test())
+
 
 
 async def first_menu(query: CallbackQuery):
@@ -69,6 +87,37 @@ async def myinfo(query: CallbackQuery):
     await query.answer()
     await query.message.answer(text=f'user_id: {user_id}\nusername: {username}')
 
+async def list_analytics(query: CallbackQuery):
+    user: User = await user_add_or_update(query, role='user', module=__name__)
+    await query.answer()
+    config = query.bot.get('config')
+    db_session = query.bot.get('db')
+    active_analytics: list[Analytic] = await Analytic.get_analytics(db_session=db_session, active=True)
+    markup= InlineKeyboardMarkup(row_width=4)
+    for analytic in active_analytics:
+        button_text = f'{analytic.Nickname}:{analytic.rating}'
+        callback_data = user_list_analytic_callback.new(id=analytic.telegram_id, is_active=True, action='list')
+        markup.insert(
+            InlineKeyboardButton(text=button_text, callback_data=callback_data)
+        )
+    markup.row(
+        InlineKeyboardButton('Main menu', callback_data=user_callback.new(action='main'))
+    )
+    await query.message.edit_text(text='Список аналитиков:', reply_markup=markup)
+
+async def choose_analytic(query: CallbackQuery, callback_data: dict):
+    db_session = query.bot.get('db')
+    logger=logging.getLogger(__name__)
+    await query.answer()
+    analytic_id=int(callback_data.get('id'))
+    analytic: Analytic = await Analytic.get_analytic_by_id(db_session=db_session, telegram_id=analytic_id)
+    text = f'''
+            Имя: {analytic.Nickname}
+Рейтинг: {analytic.rating}
+Всего прогнозов: {analytic.predicts_total}
+Информация об Аналитике: {analytic.description}
+'''
+    await query.message.answer(text=text)
 
 async def get_predict_list(query: CallbackQuery):
     user: User = await user_add_or_update(query, role='user', module=__name__)
@@ -167,8 +216,8 @@ async def subscription_edit(query: CallbackQuery):
 
 async def process_pre_checkout_query(query: PreCheckoutQuery):
     await query.bot.send_message(chat_id=query.from_user.id, text="Спасибо за подписку!")
-    answer = await query.bot.answer_pre_checkout_query(pre_checkout_query_id=query.id, ok=True)
-    print(answer)
+    await query.bot.answer_pre_checkout_query(pre_checkout_query_id=query.id, ok=True)
+    #print(answer)
 
 async def process_success_payment(query: SuccessfulPayment):
     print(query)
@@ -210,10 +259,7 @@ async def get_invitelink(query: CallbackQuery):
 async def user_help(message: Message):
     user: User = await user_add_or_update(message, role='user', module=__name__)
     await message.answer(
-            f'''Общая информация !
-Данный телеграм бот пренадлежит
-Пряхину Андрею Геннадьевичу. По всем вопросам просьба 
-обращаться по адресу apryahin@gmail.com            
+            f'''Общая информация !          
    ''')
 
 async def user_start(message: Message):
@@ -303,18 +349,20 @@ async def my_chat_member_update(my_chat_member: ChatMemberUpdated):
     print(status)
 
     # await User.add_user(db_session=db_session,
-    #               subscription_until=datetime.utcnow() + timedelta(days=1000),
+    #               subscrip81764678:TEST:30755 tion_until=datetime.utcnow() + timedelta(days=1000),
     #               is
     #               )
 
 
 def register_botuser(dp: Dispatcher):
-    dp.register_pre_checkout_query_handler(process_pre_checkout_query)
+    dp.register_pre_checkout_query_handler(process_pre_checkout_query, state="*")
     dp.register_callback_query_handler(first_menu, user_callback.filter(action='sub'), chat_type="private")
     dp.register_callback_query_handler(subscription_info, user_callback.filter(action='sub_1'), chat_type="private")
     dp.register_callback_query_handler(subscription_edit, user_callback.filter(action='sub_2'), chat_type="private")
     dp.register_callback_query_handler(get_predict_list, user_callback.filter(action='pred'), state="*", chat_type="private")
     dp.register_callback_query_handler(predict_info, user_predict_callback.filter(), state="*", chat_type="private")
+    dp.register_callback_query_handler(list_analytics, user_callback.filter(action='analytic'), state="*", chat_type="private")
+    dp.register_callback_query_handler(choose_analytic, user_list_analytic_callback.filter(), state="*", chat_type="private")
     dp.register_callback_query_handler(get_invitelink, user_callback.filter(action='link'), chat_type="private")
     dp.register_callback_query_handler(main_menu, user_callback.filter(action='main'), chat_type="private")
     dp.register_callback_query_handler(myinfo, user_callback.filter(action='myinfo'), chat_type="private")
