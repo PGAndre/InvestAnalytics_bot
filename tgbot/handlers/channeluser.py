@@ -24,6 +24,9 @@ async def chat_member_update(chat_member: ChatMemberUpdated):
     lastname = chat_member.from_user.last_name
 
     status = chat_member.new_chat_member.values['status']
+    user: User = await User.get_user(db_session=db_session,
+                                     telegram_id=user_id)
+
     role = 'user'
     admins = config.tg_bot.admin_ids
     isAnalytic = await misc.check(chat_member)
@@ -32,6 +35,8 @@ async def chat_member_update(chat_member: ChatMemberUpdated):
     isadmin = user_id in admins
     if isadmin:
         role = 'admin'
+    if user.role == 'tester':
+        role = 'tester'
 
         # запущен ли бот в бесплатном режиме.
     free = config.test.free
