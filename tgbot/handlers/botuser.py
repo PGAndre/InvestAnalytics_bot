@@ -177,7 +177,7 @@ async def predict_info(query: CallbackQuery, callback_data: dict):
 Прогноз: {start_value} {currency}➡{target} {currency}
 Цена сейчас: {latestcost} {currency}
 Аналитик: {analytic_nickname}
-Rating: {analytic_rating}
+Рейтинг: {analytic_rating}
 Всего прогнозов: {analytic_predicts_total}'''
 
     await query.message.answer(text=text,
@@ -281,6 +281,9 @@ async def my_chat_member_update(my_chat_member: ChatMemberUpdated):
     username = my_chat_member.from_user.username
     lastname = my_chat_member.from_user.last_name
     status = my_chat_member.new_chat_member.values['status']
+    user: User = await User.get_user(db_session=db_session,
+                                     telegram_id=user_id)
+
     role = 'user'
     admins = config.tg_bot.admin_ids
     isAnalytic = await misc.check(my_chat_member)
@@ -289,6 +292,8 @@ async def my_chat_member_update(my_chat_member: ChatMemberUpdated):
     isadmin = str(user_id) in admins
     if isadmin:
         role = 'admin'
+    if user.role == 'tester':
+        role = 'tester'
 
     user: User = await User.get_user(db_session=db_session,
                                      telegram_id=user_id)

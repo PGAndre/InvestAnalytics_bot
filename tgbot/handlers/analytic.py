@@ -132,7 +132,7 @@ async def predict_info(query: CallbackQuery, callback_data: dict):
 Прогноз: {start_value} {currency}➡{target} {currency}
 Цена сейчас: {latestcost} {currency}
 Аналитик: {analytic_nickname}
-Rating: {analytic_rating}
+Рейтинг: {analytic_rating}
 Всего прогнозов: {analytic_predicts_total}'''
 
     await query.message.answer(text=text,
@@ -305,7 +305,7 @@ async def confirm(message: Message, state: FSMContext):
 ⏱Дата окончания:  {predicted_date.date():%d-%m-%Y}
 Цена: {start_value} {currency}➡{target} {currency}
 Аналитик: {analytic.Nickname}
-Rating: {analytic.rating}
+Рейтинг: {analytic.rating}
 Всего прогнозов: {analytic.predicts_total}'''
 
 
@@ -342,7 +342,7 @@ async def publish(message: Message, state: FSMContext):
 ⏱Дата окончания:  {predicted_date.date():%d-%m-%Y}
 Цена: {start_value} {currency}➡{target} {currency}
 Аналитик: {analytic_nickname}
-Rating: {analytic_rating}
+Рейтинг: {analytic_rating}
 Всего прогнозов: {analytic_predicts_total}'''
     logger = logging.getLogger(__name__)
 
