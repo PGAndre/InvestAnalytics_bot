@@ -12,6 +12,12 @@ class DbConfig:
     database: str
 
 @dataclass
+class RedisConfig:
+    host: str
+    password: str
+    port: int
+
+@dataclass
 class TestMode:
     free: bool
     free_subtime: str
@@ -41,6 +47,7 @@ class Config:
     db: DbConfig
     misc: Miscellaneous
     test: TestMode
+    redis: RedisConfig
 
 
 def load_config(path: str = None):
@@ -72,5 +79,10 @@ def load_config(path: str = None):
         misc=Miscellaneous(
             tcs_token=env.str('TCS_TOKEN'),
             ykassa_token=env.str('YKASSA_TOKEN')
+        ),
+        redis=RedisConfig(
+            host=env.str('REDIS_HOST'),
+            password=env.str('REDIS_PASS'),
+            port=env.int('REDIS_PORT')
         )
     )
