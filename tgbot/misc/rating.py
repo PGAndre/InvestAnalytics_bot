@@ -139,9 +139,18 @@ async def predictions_active_finished():
     for prediction in predictions:
         print(f' предикт: прогнозируемое значение: {prediction.analytic.__dict__}, {prediction}, {prediction.__dict__}')
         analytic_id = prediction.analytic_id
-        prediction_rating = await prediction.calculate_rating()
-
         analytic = await Analytic.get_analytic_by_id(db_session=db_session, telegram_id=prediction.analytic_id)
+        prediction_rating = await prediction.calculate_rating(analytic)
+        try:
+            if analytic.bonuscount>0:
+                bonuscount=analytic.bonuscount-1
+                if bonuscount==0:
+                    await analytic.update_analytic(db_session=db_session, bonus=0, bonuscount=0)
+                else:
+                    await analytic.update_analytic(db_session=db_session, bonuscount=bonuscount)
+        except TypeError:
+            pass
+
 
         new_rating = await analytic.calculate_rating(prediction_rating)
         print(f' ПОСЧИТАННЫЙ РЕЙТИНГ АНАЛИТИКА {new_rating}')
@@ -389,5 +398,5 @@ async def calculate_rating_job():
     await predictions_active_finished()
 
 #
-# asyncio.run(predictions_active())
-# asyncio.run(predictions_active_finished())
+asyncio.run(predictions_active())
+asyncio.run(predictions_active_finished())

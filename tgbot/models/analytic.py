@@ -4,6 +4,7 @@ import decimal
 import math
 from contextlib import suppress
 from decimal import Decimal
+import random
 
 from sqlalchemy import Column, BigInteger, Integer, insert, String, ForeignKey, update, func, DateTime, Sequence, \
     Numeric, Boolean, true, MetaData
@@ -26,6 +27,8 @@ class Analytic(Base):
     created_date = Column(DateTime, default=datetime.datetime.utcnow)
     updated_date = Column(DateTime(timezone=True), onupdate=func.now())
     is_active = Column(Boolean, default=True)
+    bonus = Column(Integer, default=0, nullable=True)
+    bonuscount = Column(Integer, default=0, nullable=True)
 
 
     @classmethod
@@ -211,7 +214,7 @@ class Prediction(Base):
             return prediction
 
 
-    async def calculate_rating(self):
+    async def calculate_rating(self, analytic):
         end_value = self.end_value
         predicted_value = self.predicted_value
         start_value = self.start_value
@@ -220,6 +223,12 @@ class Prediction(Base):
         end_date = self.end_date
         predict_days = (end_date.date() - start_date.date()).days
         predict_days = await bdays.count_tdays(start_date, end_date)
+        bonus=0
+        try:
+            if analytic.bonuscount > 0:
+                bonus=analytic.bonus
+        except TypeError:
+            pass
 
 
         print(f'predicted_days: {predict_days}')
@@ -237,10 +246,21 @@ class Prediction(Base):
         # predict_sign = decimal.Decimal(math.copysign(1, (prediction.predicted_value - prediction.start_value)))
         # print(predict_sign)
         # prediction_index = current_difference * predict_sign
-
-        rating = (1 + sign_profit*math.pow((min((22 - predict_days), 22)/22), 1/3)*math.pow(float(predicted_profit)/0.30, 1/3)*math.pow(min(abs(profit), predicted_profit)/predicted_profit, 1/3))/2
+        bonus=random.randrange(bonus*100-20,bonus*100+20,1)/100
+        delta=sign_profit*math.pow((min((22 - predict_days), 22)/22), 1/3)*math.pow(float(predicted_profit)/0.30, 1/3)*math.pow(min(abs(profit), predicted_profit)/predicted_profit, 1/3)
+        rating = (1 + delta)/2
 #        rating = (31 - predict_days)/30
         rating_rounded = round(rating*100, 2)
+        overbonus=random.randrange(180,220,1)/100
+        if sign_profit > 0:
+            rating_rounded += bonus
+            if rating_rounded > 100:
+                rating_rounded = 100 - overbonus
+        else:
+            rating_rounded += bonus
+            if rating_rounded > 50:
+                rating_rounded = 50-overbonus
+        rating_rounded = round(rating_rounded,2)
         print(math.pow(min((22 - predict_days), 22)/22, 1/3))
         print(math.pow(float(predicted_profit)/0.30, 1/3))
         print(math.pow(min(abs(profit), predicted_profit)/predicted_profit, 1/3))
