@@ -69,7 +69,7 @@ async def check_analytic(message: Message, state: FSMContext):
             text=f'''этот пользователь уже есть в базе Аналитиков, но в данный момент неактивен. 
 Для включения роли аналитика для этого пользователя перейдите в меню "Управление Аналитиками\Активировать Аналитика"
 Аналитик: {analytic.Nickname}
-Rating: {analytic.rating}'''
+Рейтинг: {analytic.rating}'''
             await message.answer(text=text)
             state = await state.reset_state()
             await add_analytic(message)
