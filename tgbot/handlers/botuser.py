@@ -281,8 +281,6 @@ async def my_chat_member_update(my_chat_member: ChatMemberUpdated):
     username = my_chat_member.from_user.username
     lastname = my_chat_member.from_user.last_name
     status = my_chat_member.new_chat_member.values['status']
-    user: User = await User.get_user(db_session=db_session,
-                                     telegram_id=user_id)
 
     role = 'user'
     admins = config.tg_bot.admin_ids
@@ -292,8 +290,6 @@ async def my_chat_member_update(my_chat_member: ChatMemberUpdated):
     isadmin = str(user_id) in admins
     if isadmin:
         role = 'admin'
-    if user.role == 'tester':
-        role = 'tester'
 
     user: User = await User.get_user(db_session=db_session,
                                      telegram_id=user_id)
@@ -327,6 +323,9 @@ async def my_chat_member_update(my_chat_member: ChatMemberUpdated):
 
 
         else:  # если такой пользователь уже найден - меняем ему статус is_member = true
+            user: User = await User.get_user(db_session=db_session, telegram_id=user_id)
+            if user.role == 'tester':
+                role = 'tester'
             updated_user: User = await user.update_user(db_session=db_session,
                                                         role=role,
                                                         is_botuser=True)
@@ -343,6 +342,9 @@ async def my_chat_member_update(my_chat_member: ChatMemberUpdated):
         if not user:
             pass
         else:
+            user: User = await User.get_user(db_session=db_session, telegram_id=user_id)
+            if user.role == 'tester':
+                role = 'tester'
             updated_user: User = await user.update_user(db_session=db_session,
                                                         role=role,
                                                         is_botuser=False)
