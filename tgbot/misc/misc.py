@@ -66,6 +66,14 @@ async def user_add_or_update(obj, role: str, module: str) -> User:
 
 
     else:
+        if user.is_botuser != True:
+            updated_user: User = await user.update_user(db_session=db_session,
+                                                        is_botuser=True)
+            user: User = await User.get_user(db_session=db_session, telegram_id=user_id)
+            logger.info(
+                f'пользователь подключил бота {user.telegram_id}, {user.username}, {user.first_name}\n')
+            logger.info(f'{user.__dict__}')
+
         if user.role == role:
             return user
 
@@ -83,5 +91,7 @@ async def user_add_or_update(obj, role: str, module: str) -> User:
         logger.info(
             f'роль пользователя {user.telegram_id}, {user.username}, {user.first_name} обновлена в базе на {role}')
         logger.info(f'{user.__dict__}')
+
+
 
     return user
