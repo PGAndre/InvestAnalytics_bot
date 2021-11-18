@@ -92,14 +92,14 @@ async def chat_member_update(chat_member: ChatMemberUpdated):
 
 
     elif status == 'left':
-        user: User = await User.get_user(db_session=db_session, telegram_id=user_id)
-        if user.role == 'tester':
-            role = 'tester'
         user: User = await User.get_user(db_session=db_session,
                                          telegram_id=user_id)
         if not user:
             pass
         else:
+            user: User = await User.get_user(db_session=db_session, telegram_id=user_id)
+            if user.role == 'tester':
+                role = 'tester'
             updated_user: User = await user.update_user(db_session=db_session,
                                                         is_member=False,
                                                         role=role)
