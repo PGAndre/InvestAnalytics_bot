@@ -48,23 +48,6 @@ services:
     networks:
       - botnet
 
-  redis:
-    image: "redis:alpine"
-
-    command: redis-server --requirepass ${REDIS_PASS}
-
-    ports:
-      - "6379:6379"
-    restart: always
-
-    volumes:
-      - /var/lib/invest_db/${BOT_NAME}/redis-data:/var/lib/redis
-      - /var/lib/invest_db/${BOT_NAME}/redis.conf:/usr/local/etc/redis/redis.conf
-
-    environment:
-      - REDIS_REPLICATION_MODE=master
-    networks:
-      - botnet
 networks:
   botnet:
    driver: bridge

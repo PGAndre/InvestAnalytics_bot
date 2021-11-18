@@ -3,7 +3,8 @@ from logging.handlers import RotatingFileHandler
 
 from aiogram import Bot
 from aiogram.contrib.fsm_storage.memory import MemoryStorage
-from aiogram.contrib.fsm_storage.redis import RedisStorage
+from aiogram.contrib.fsm_storage.redis import RedisStorage2
+from aiogram.types import BotCommand
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
 from tgbot.config import load_config
@@ -55,14 +56,20 @@ async def main():
         ])
     logger.info("Starting bot")
     config = load_config(".env")
+    redis_host=config.redis.host
+    redis_port = config.redis.port
+    redis_password = config.redis.password
 
     if config.tg_bot.use_redis:
-        storage = RedisStorage()
+        storage = RedisStorage2(host=redis_host,port=redis_port,password=redis_password)
     else:
         storage = MemoryStorage()
 
     bot = Bot(token=config.tg_bot.token, parse_mode='HTML')
     dp = Dispatcher(bot, storage=storage)
+
+    command = [BotCommand("menu", "чтобы открыть меню")]
+    await bot.set_my_commands(command)
 
     bot['config'] = config
     bot['db'] = await create_db_session(config)
