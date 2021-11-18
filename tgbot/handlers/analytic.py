@@ -198,6 +198,7 @@ async def check_ticker(message: Message, state: FSMContext):
         else:
             latestcost = await tinkoff.get_latest_cost_history(figi=instrument['figi'], config=config,
                                                                to_time=datetime.utcnow())
+            latestcost=float(latestcost)
             text = f'Курс акции равен {latestcost}.\nВведите срок прогноза в днях(учитываются только торговые дни)'
             await message.answer(text, reply_markup=reply.cancel_back_markup)
             await state.update_data(ticker=ticker.upper())
@@ -267,7 +268,7 @@ async def confirm(message: Message, state: FSMContext):
 
     async with state.proxy() as data:
         start_value = data['start_value']
-    profit = (decimal.Decimal(target) - start_value) * 100 / start_value
+    profit = (target - start_value) * 100 / start_value
     if abs(profit) > 30:
         await message.answer('доходность прогноза не должна привышать 30%.')
         async with state.proxy() as data:
@@ -291,7 +292,7 @@ async def confirm(message: Message, state: FSMContext):
     async with state.proxy() as data:
         data['target'] = target
         data['analytic_nickname'] = analytic.Nickname
-        data['analytic_rating'] = analytic.rating
+        data['analytic_rating'] = float(analytic.rating)
         data['predicts_total'] = analytic.predicts_total
     ticker = data['ticker']
     predict_time = data['predict_time']
