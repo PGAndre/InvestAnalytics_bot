@@ -18,10 +18,10 @@ async def chat_member_update(chat_member: ChatMemberUpdated):
     db_session = chat_member.bot.get('db')
     #это надо реализовать фильтром
     chat = chat_member.chat# если чат совпадает с чатом из конфига
-    user_id = chat_member.from_user.id
-    firstname = chat_member.from_user.first_name
-    username = chat_member.from_user.username
-    lastname = chat_member.from_user.last_name
+    user_id = chat_member.new_chat_member.user.id
+    firstname = chat_member.new_chat_member.user.first_name
+    username = chat_member.new_chat_member.user.username
+    lastname = chat_member.new_chat_member.user.last_name
 
     status = chat_member.new_chat_member.values['status']
 
