@@ -164,11 +164,14 @@ async def choose_analytic(query: CallbackQuery, callback_data: dict):
     else:
         status='Отключен'
     text = f'''
-            Имя: {analytic.Nickname}
-id: {analytic.telegram_id}
-Рейтинг: {analytic.rating}
-Всего прогнозов: {analytic.predicts_total}
-Статус: {status}
+            Имя: <b>{analytic.Nickname}</b>
+id: <b>{analytic.telegram_id}</b>
+Рейтинг: <b>{analytic.rating}</b>
+Всего прогнозов: <b>{analytic.predicts_total}</b>
+Бонус: <b>{analytic.bonus}</b>
+Осталось Бонусов: <b>{analytic.bonuscount}</b>
+Информация об аналитике: {analytic.description}
+Статус: <b>{status}</b>
 '''
 
     markup = InlineKeyboardMarkup(row_width=5)
