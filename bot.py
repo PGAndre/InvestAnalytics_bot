@@ -1,10 +1,12 @@
 import asyncio
 from logging.handlers import RotatingFileHandler
 
+import aiogram
 from aiogram import Bot
 from aiogram.contrib.fsm_storage.memory import MemoryStorage
 from aiogram.contrib.fsm_storage.redis import RedisStorage2
-from aiogram.types import BotCommand
+from aiogram.types import BotCommand, BotCommandScope, BotCommandScopeAllPrivateChats, BotCommandScopeType, \
+    BotCommandScopeDefault, BotCommandScopeChat
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
 from tgbot.config import load_config
@@ -68,8 +70,17 @@ async def main():
     bot = Bot(token=config.tg_bot.token, parse_mode='HTML')
     dp = Dispatcher(bot, storage=storage)
 
-    command = [BotCommand("menu", "чтобы открыть меню")]
-    await bot.set_my_commands(command)
+    # scope = BotCommandScopeDefault(type=BotCommandScopeType.DEFAULT)
+    # await bot.set_my_commands(commands=command, scope=scope)
+
+    # scope = BotCommandScopeChat(chat_id=-1001317811501)
+
+
+    command = [BotCommand("menu", "открыть меню")]
+    scope = BotCommandScopeAllPrivateChats(type=BotCommandScopeType.ALL_PRIVATE_CHATS) # именять команды только к приватным чатам
+    await bot.delete_my_commands(scope=scope) #удаляем меню из ранее установленных чатов
+    await bot.delete_my_commands() # удаляем меню изо всех других чатов, куда он прилетал.
+    await bot.set_my_commands(commands=command, scope=scope) #устанавливаем меню в private chats
 
     bot['config'] = config
     bot['db'] = await create_db_session(config)

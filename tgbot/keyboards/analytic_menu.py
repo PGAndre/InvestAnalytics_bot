@@ -4,7 +4,7 @@ from tgbot.keyboards.callback_datas import analytic_callback
 
 
 def main_menu_keyboard():
-    keyboard = [[InlineKeyboardButton('Упавление прогнозами', callback_data=analytic_callback.new(action='pred'))],
+    keyboard = [[InlineKeyboardButton('Управление прогнозами', callback_data=analytic_callback.new(action='pred'))],
                 [InlineKeyboardButton('Получить ссылку на канал', callback_data=analytic_callback.new(action='link'))],
                 [InlineKeyboardButton('Информация о пользователе', callback_data=analytic_callback.new(action='myinfo'))]]
     return InlineKeyboardMarkup(inline_keyboard=keyboard)

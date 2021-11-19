@@ -1,4 +1,5 @@
 import logging
+import math
 import pprint
 from datetime import datetime, timedelta
 
@@ -112,9 +113,9 @@ async def choose_analytic(query: CallbackQuery, callback_data: dict):
     analytic_id=int(callback_data.get('id'))
     analytic: Analytic = await Analytic.get_analytic_by_id(db_session=db_session, telegram_id=analytic_id)
     text = f'''
-            Имя: {analytic.Nickname}
-Рейтинг: {analytic.rating}
-Всего прогнозов: {analytic.predicts_total}
+            Имя: <b>{analytic.Nickname}</b>
+Рейтинг: <b>{analytic.rating}</b>
+Всего прогнозов: <b>{analytic.predicts_total}</b>
 Информация об Аналитике: {analytic.description}
 '''
     await query.message.answer(text=text)
@@ -154,9 +155,9 @@ async def predict_info(query: CallbackQuery, callback_data: dict):
     db_session = query.bot.get('db')
     logger=logging.getLogger(__name__)
     await query.answer()
-    logger.info(f"{callback_data}")
+    # logger.info(f"{callback_data}")
     ticker=callback_data.get('ticker')
-    logger.info(f'{ticker}')
+    # logger.info(f'{ticker}')
     predict = await Prediction.get_predict(db_session=db_session, ticker=ticker)
     name = predict.name
     start_value = predict.start_value
@@ -170,15 +171,21 @@ async def predict_info(query: CallbackQuery, callback_data: dict):
     instrument = await tinkoff.search_by_ticker(ticker, config)
     latestcost = await tinkoff.get_latest_cost_history(figi=instrument['figi'], config=config,
                                                        to_time=datetime.utcnow())
+    profit=target-start_value
+    sign_profit = math.copysign(1, profit)
+    if sign_profit==-1:
+        circle='🔴'
+    else:
+        circle='🟢'
     text = f'''
-                🏦${ticker} ({name})
-⏱Дата начала: {start_date.date():%d-%m-%Y}                 
-⏱Дата окончания:  {predicted_date.date():%d-%m-%Y}
-Прогноз: {start_value} {currency}➡{target} {currency}
-Цена сейчас: {latestcost} {currency}
-Аналитик: {analytic_nickname}
-Рейтинг: {analytic_rating}
-Всего прогнозов: {analytic_predicts_total}'''
+                🏦<b>${ticker}</b> ({name})
+⏱Дата начала: <b>{start_date.date():%d-%m-%Y}</b>                 
+⏱Дата окончания:  <b>{predicted_date.date():%d-%m-%Y}</b>
+{circle}Прогноз: <b>{start_value} {currency}</b>➡<b>{target} {currency}</b>
+Цена сейчас: <b>{latestcost} {currency}</b>
+Аналитик: <b>{analytic_nickname}</b>
+Рейтинг: <b>{analytic_rating}</b>
+Всего прогнозов: <b>{analytic_predicts_total}</b>'''
 
     await query.message.answer(text=text,
                                    reply_markup=InlineKeyboardMarkup(inline_keyboard=[
