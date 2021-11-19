@@ -8,6 +8,8 @@ from aiogram.contrib.fsm_storage.redis import RedisStorage2
 from aiogram.types import BotCommand, BotCommandScope, BotCommandScopeAllPrivateChats, BotCommandScopeType, \
     BotCommandScopeDefault, BotCommandScopeChat
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
+from apscheduler.triggers.combining import OrTrigger
+from apscheduler.triggers.cron import CronTrigger
 
 from tgbot.config import load_config
 from tgbot.filters.admin import AdminFilter
@@ -87,7 +89,11 @@ async def main():
     scheduler = AsyncIOScheduler()
     print(datetime.now())
     #scheduler.add_job(calculate_rating_job, 'interval', seconds=5)
-    scheduler.add_job(calculate_rating_job, "cron", hour='7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23')
+    trigger = OrTrigger([
+        CronTrigger(hour='0-23', minute='*'),
+    ])
+    scheduler.add_job(calculate_rating_job, trigger)
+    # scheduler.add_job(calculate_rating_job, "cron", hour='7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23')
     scheduler.add_job(kick_users, "cron", hour='18')
     scheduler.add_job(notify_users_with_active_sub, "cron", hour='17')
     scheduler.add_job(notify_users_with_inactive_sub, "cron", hour='17')
