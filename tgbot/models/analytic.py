@@ -149,6 +149,17 @@ class Prediction(Base):
             predict: cls = request.scalar()
             return predict
 
+    @classmethod
+    async def get_predict_by_analytic(cls,
+                          db_session: sessionmaker,
+                          analytic_id: BigInteger ) -> 'Prediction':
+        async with db_session() as db_session:
+            sql = select(cls).where(cls.is_active == true()).where(cls.analytic_id == analytic_id).join(Analytic,
+                                                                                       Analytic.telegram_id == cls.analytic_id)
+            request = await db_session.execute(sql)
+            predict: cls = request.scalars()
+            return predict
+
     # @classmethod
     # async def get_predict(cls,
     #                       db_session: sessionmaker,
