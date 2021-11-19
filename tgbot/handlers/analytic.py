@@ -1,5 +1,6 @@
 import decimal
 import logging
+import math
 from decimal import Decimal
 
 from aiogram import Dispatcher
@@ -109,9 +110,9 @@ async def predict_info(query: CallbackQuery, callback_data: dict):
     db_session = query.bot.get('db')
     logger=logging.getLogger(__name__)
     await query.answer()
-    logger.info(f"{callback_data}")
+    #logger.info(f"{callback_data}")
     ticker=callback_data.get('ticker')
-    logger.info(f'{ticker}')
+    #logger.info(f'{ticker}')
     predict = await Prediction.get_predict(db_session=db_session, ticker=ticker)
     name = predict.name
     start_value = predict.start_value
@@ -125,15 +126,21 @@ async def predict_info(query: CallbackQuery, callback_data: dict):
     instrument = await tinkoff.search_by_ticker(ticker, config)
     latestcost = await tinkoff.get_latest_cost_history(figi=instrument['figi'], config=config,
                                                        to_time=datetime.utcnow())
+    profit = target - start_value
+    sign_profit = math.copysign(1, profit)
+    if sign_profit == -1:
+        circle = '🔴'
+    else:
+        circle = '🟢'
     text = f'''
-                🏦${ticker} ({name})
-⏱Дата начала: {start_date.date():%d-%m-%Y}                 
-⏱Дата окончания:  {predicted_date.date():%d-%m-%Y}
-Прогноз: {start_value} {currency}➡{target} {currency}
-Цена сейчас: {latestcost} {currency}
-Аналитик: {analytic_nickname}
-Рейтинг: {analytic_rating}
-Всего прогнозов: {analytic_predicts_total}'''
+                🏦<b>${ticker}</b> ({name})
+⏱Дата начала: <b>{start_date.date():%d-%m-%Y}</b>                 
+⏱Дата окончания:  <b>{predicted_date.date():%d-%m-%Y}</b>
+{circle}Прогноз: <b>{start_value} {currency}</b>➡<b>{target} {currency}</b>
+Цена сейчас: <b>{latestcost} {currency}</b>
+Аналитик: <b>{analytic_nickname}</b>
+Рейтинг: <b>{analytic_rating}</b>
+Всего прогнозов: <b>{analytic_predicts_total}</b>'''
 
     await query.message.answer(text=text,
                                    reply_markup=InlineKeyboardMarkup(inline_keyboard=[
@@ -199,7 +206,7 @@ async def check_ticker(message: Message, state: FSMContext):
             latestcost = await tinkoff.get_latest_cost_history(figi=instrument['figi'], config=config,
                                                                to_time=datetime.utcnow())
             latestcost=float(latestcost)
-            text = f'Курс акции равен {latestcost}.\nВведите срок прогноза в днях(учитываются только торговые дни)'
+            text = f'Курс акции равен <b>{latestcost}</b>.\nВведите срок прогноза в днях(учитываются только торговые дни)'
             await message.answer(text, reply_markup=reply.cancel_back_markup)
             await state.update_data(ticker=ticker.upper())
             await state.update_data(start_value=latestcost)
@@ -255,7 +262,7 @@ async def set_date(message: Message, state: FSMContext):
 
 
 async def confirm(message: Message, state: FSMContext):
-    global target
+    # global target
     try:
         target = float(message.text)
     except ValueError:
@@ -300,14 +307,21 @@ async def confirm(message: Message, state: FSMContext):
     target = data['target']
     name = data['name']
     currency = data['currency']
+    profit=target-start_value
+    sign_profit = math.copysign(1, profit)
+    if sign_profit==-1:
+        circle='🔴'
+    else:
+        circle='🟢'
+
 
     text = f'''
-            🏦${ticker} ({name})
-⏱Дата окончания:  {predicted_date.date():%d-%m-%Y}
-Цена: {start_value} {currency}➡{target} {currency}
-Аналитик: {analytic.Nickname}
-Рейтинг: {analytic.rating}
-Всего прогнозов: {analytic.predicts_total}'''
+            🏦<b>${ticker}</b> ({name})
+⏱Дата окончания:  <b>{predicted_date.date():%d-%m-%Y}</b>
+{circle}Цена: <b>{start_value} {currency}</b>➡<b>{target} {currency}</b>
+Аналитик: <b>{analytic.Nickname}</b>
+Рейтинг: <b>{analytic.rating}</b>
+Всего прогнозов: <b>{analytic.predicts_total}</b>'''
 
 
     await message.answer(text=text, reply_markup=reply.confirm)
@@ -328,6 +342,14 @@ async def publish(message: Message, state: FSMContext):
         analytic_rating = data['analytic_rating']
         analytic_predicts_total = data['predicts_total']
         predicted_date = await bdays.next_business_day(datetime.utcnow(), predict_time)
+
+    profit=target-start_value
+    sign_profit = math.copysign(1, profit)
+    if sign_profit==-1:
+        circle='🔴'
+    else:
+        circle='🟢'
+
     db_session = message.bot.get('db')
     prediction: Prediction = await Prediction.add_predict(db_session=db_session,
                                                           ticker=ticker,
@@ -339,12 +361,12 @@ async def publish(message: Message, state: FSMContext):
                                                           predicted_value=target,
                                                           analytic_id=message.from_user.id)
     text = f'''
-        🏦${ticker} ({name})
-⏱Дата окончания:  {predicted_date.date():%d-%m-%Y}
-Цена: {start_value} {currency}➡{target} {currency}
-Аналитик: {analytic_nickname}
-Рейтинг: {analytic_rating}
-Всего прогнозов: {analytic_predicts_total}'''
+        🏦<b>${ticker}</b> ({name})
+⏱Дата окончания:  <b>{predicted_date.date():%d-%m-%Y}</b>
+{circle}Цена: <b>{start_value} {currency}</b>➡<b>{target} {currency}</b>
+Аналитик: <b>{analytic_nickname}</b>
+Рейтинг: <b>{analytic_rating}</b>
+Всего прогнозов: <b>{analytic_predicts_total}</b>'''
     logger = logging.getLogger(__name__)
 
     await message.answer(text=text,

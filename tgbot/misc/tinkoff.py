@@ -14,7 +14,7 @@ async def search_by_ticker(ticker: str, config: Config):
     client = tinvest.AsyncClient(tcs_token)
     ticker = await client.get_market_search_by_ticker(ticker)
     await client.close()
-    pprint.pprint(ticker.__dict__)
+    # pprint.pprint(ticker.__dict__)
     if len(ticker.payload.instruments) != 0:
         name = ticker.payload.instruments[0].name
         figi = ticker.payload.instruments[0].figi
@@ -30,8 +30,8 @@ async def search_by_ticker_test(ticker: str):
     client = tinvest.AsyncClient(token)
     ticker = await client.get_market_search_by_ticker(ticker)
     await client.close()
-    pprint.pprint(ticker.__dict__)
-    print(len(ticker.payload.instruments) != 0)
+    # pprint.pprint(ticker.__dict__)
+    # print(len(ticker.payload.instruments) != 0)
     if len(ticker.payload.instruments) != 0:
         name = ticker.payload.instruments[0].name
         figi = ticker.payload.instruments[0].figi
@@ -64,7 +64,7 @@ async def get_latest_cost(figi: str, config: Config, *args):
     nowtime = datetime.utcnow()
     fromtime = datetime.utcnow() - timedelta(hours=3)
     candles: Candles = await get_market_candles(figi=figi, from_=fromtime, to=nowtime, interval=CandleResolution.min1, config=config)
-    print(candles)
+    # print(candles)
     if not candles.candles:
         fromtime = datetime.utcnow() - timedelta(hours=10)
         candles: Candles = await get_market_candles(figi=figi, from_=fromtime, to=nowtime,
@@ -81,7 +81,7 @@ async def get_latest_cost(figi: str, config: Config, *args):
     # print(count)
     # print(type(candles.candles))
     # print(max(candle.h for candle in candles.candles))
-    print(max(candles.candles, key=lambda item: item.h))  # среди всех объектов свечей выдаёт ту, у которой значение h(high price) максимально
+    # print(max(candles.candles, key=lambda item: item.h))  # среди всех объектов свечей выдаёт ту, у которой значение h(high price) максимально
     return candles.candles[-1].c
 
 async def get_latest_cost_history(figi: str, config: Config, to_time: datetime):
@@ -89,7 +89,7 @@ async def get_latest_cost_history(figi: str, config: Config, to_time: datetime):
     fromtime = to_time - timedelta(hours=3)
     candles: Candles = await get_market_candles(figi=figi, from_=fromtime, to=to_time, interval=CandleResolution.min1,
                                                 config=config)
-    print(candles)
+    # print(candles)
     if not candles.candles:
         fromtime = datetime.utcnow() - timedelta(hours=10)
         candles: Candles = await get_market_candles(figi=figi, from_=fromtime, to=to_time,
@@ -98,7 +98,7 @@ async def get_latest_cost_history(figi: str, config: Config, to_time: datetime):
             fromtime = datetime.utcnow() - timedelta(hours=100)
             candles: Candles = await get_market_candles(figi=figi, from_=fromtime, to=to_time,
                                                         interval=CandleResolution.hour, config=config)
-    print(candles)
+    # print(candles)
     count = 0
     # for candle in candles.candles:
     #     pprint.pprint(candle)
