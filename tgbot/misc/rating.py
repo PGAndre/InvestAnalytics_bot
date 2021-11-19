@@ -204,6 +204,14 @@ async def prediction_candle_analys(prediction: Prediction, config: Config):
         print(datetime.utcnow())
         isLong = math.copysign(1, (prediction.predicted_value - prediction.start_value))
         print(isLong)
+        candles_lasthour = (
+            await get_candles_inrange(figi=prediction.figi, from_=datetime.utcnow()+ timedelta(hours=-2),
+                                      to=datetime.utcnow(),
+                                      interval='minute',
+                                      config=config)).candles
+
+        candles_lasthour = [x for x in candles_lasthour if x.time.replace(tzinfo=None) <= datetime.now()]
+        candles_lasthour = [x for x in candles_lasthour if x.time.replace(tzinfo=None) <= prediction.predicted_date]
         candles_firsthour = (
             await get_candles_inrange(figi=prediction.figi, from_=prediction.start_date + timedelta(hours=-1),
                                       to=(prediction.start_date + timedelta(hours=1)).replace(minute=59, second=0),
@@ -227,7 +235,7 @@ async def prediction_candle_analys(prediction: Prediction, config: Config):
 
         candles_dayly = [x for x in candles_dayly if x.time.replace(tzinfo=None) <= prediction.predicted_date]
 
-        all_candles = candles_firsthour + candles_hourly + candles_dayly
+        all_candles = candles_firsthour + candles_hourly + candles_dayly + candles_lasthour
         if not all_candles:
             predictionanalysis = None
             return predictionanalysis
@@ -237,8 +245,8 @@ async def prediction_candle_analys(prediction: Prediction, config: Config):
             candles_morethen_predicted = [x for x in all_candles if x.h >= prediction.predicted_value]
             print(f'maxof_candles.h: {bestcandle.h}')
         else:
-            bestcandle = min(candles_hourly, key=lambda item: item.l)
-            candles_morethen_predicted = [x for x in candles_hourly if x.l <= prediction.predicted_value]
+            bestcandle = min(all_candles, key=lambda item: item.l)
+            candles_morethen_predicted = [x for x in all_candles if x.l <= prediction.predicted_value]
             print(f'minof_candles_daily.h: {bestcandle.l}')
 
         if not candles_morethen_predicted:
@@ -269,8 +277,8 @@ async def prediction_candle_analys(prediction: Prediction, config: Config):
         print(f'от двух часов')
         print(prediction.start_date + timedelta(hours=2))
         print(datetime.utcnow())
-        to_time = (prediction.start_date + timedelta(hours=1)).replace(minute=59, second=0)
-        print(to_time)
+        # to_time = (prediction.start_date + timedelta(hours=1)).replace(minute=59, second=0)
+        # print(to_time)
         isLong = math.copysign(1, (prediction.predicted_value - prediction.start_value))
         print(isLong)
         candles_firsthour = (
@@ -281,6 +289,16 @@ async def prediction_candle_analys(prediction: Prediction, config: Config):
 
         candles_firsthour = [x for x in candles_firsthour if x.time.replace(tzinfo=None) >= prediction.start_date]
 
+        candles_lasthour = (
+            await get_candles_inrange(figi=prediction.figi, from_=datetime.utcnow() + timedelta(hours=-2),
+                                      to=datetime.utcnow(),
+                                      interval='minute',
+                                      config=config)).candles
+
+        candles_lasthour = [x for x in candles_lasthour if x.time.replace(tzinfo=None) <= datetime.now()]
+        candles_lasthour = [x for x in candles_lasthour if x.time.replace(tzinfo=None) <= prediction.predicted_date]
+
+
         candles_hourly = (
             await get_candles_inrange(figi=prediction.figi, from_=prediction.start_date, to=datetime.utcnow(),
                                       interval='hour',
@@ -289,7 +307,7 @@ async def prediction_candle_analys(prediction: Prediction, config: Config):
 
         candles_hourly = [x for x in candles_hourly if x.time.replace(tzinfo=None) <= prediction.predicted_date]
 
-        all_candles = candles_firsthour + candles_hourly
+        all_candles = candles_firsthour + candles_hourly + candles_lasthour
         if not all_candles:
             predictionanalysis = None
             return predictionanalysis
@@ -299,8 +317,8 @@ async def prediction_candle_analys(prediction: Prediction, config: Config):
             candles_morethen_predicted = [x for x in all_candles if x.h >= prediction.predicted_value]
             print(f'maxof_candles.h: {bestcandle.h}')
         else:
-            bestcandle = min(candles_hourly, key=lambda item: item.l)
-            candles_morethen_predicted = [x for x in candles_hourly if x.l <= prediction.predicted_value]
+            bestcandle = min(all_candles, key=lambda item: item.l)
+            candles_morethen_predicted = [x for x in all_candles if x.l <= prediction.predicted_value]
             print(f'minof_candles_daily.h: {bestcandle.l}')
 
         if not candles_morethen_predicted:
