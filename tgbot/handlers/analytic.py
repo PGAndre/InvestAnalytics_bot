@@ -11,7 +11,7 @@ from aiogram.utils.markdown import hcode
 
 from tgbot.handlers.botuser import myinfo
 from tgbot.keyboards.analytic_menu import *
-from tgbot.keyboards.callback_datas import predict_callback
+from tgbot.keyboards.callback_datas import predict_callback, list_my_predicts_callback
 from tgbot.misc.misc import user_add_or_update
 
 from tgbot.models.analytic import Prediction, Analytic
@@ -286,7 +286,7 @@ async def confirm(message: Message, state: FSMContext):
         return
 
     if abs(profit) < 3:
-        await message.answer('доходность прогноза должна быть меньше 3%.')
+        await message.answer('доходность прогноза должна быть не меньше 3%.')
         async with state.proxy() as data:
             message.text = data['predict_time']
         await Predict.Set_Date.set()
@@ -387,11 +387,159 @@ async def publish(message: Message, state: FSMContext):
     await state.finish()
 
 
+async def my_active_predicts(query: CallbackQuery):
+    user: User = await user_add_or_update(query, role='analytic', module=__name__)
+    await query.answer()
+    config = query.bot.get('config')
+    db_session = query.bot.get('db')
+    analytic_id=query.from_user.id
+    my_active_predicts: list[Prediction] = await Prediction.get_predict_by_analytic(db_session=db_session, analytic_id=analytic_id)
+
+    print(my_active_predicts)
+    markup= InlineKeyboardMarkup(row_width=4)
+    for prediction in my_active_predicts:
+        button_text = f'${prediction.ticker}'
+        callback_data = list_my_predicts_callback.new(ticker=prediction.ticker, action='choose')
+        markup.insert(
+            InlineKeyboardButton(text=button_text, callback_data=callback_data)
+        )
+    markup.row(
+        InlineKeyboardButton('Main menu', callback_data=analytic_callback.new(action='main'))
+    )
+    await query.message.edit_text(text='Список моих активных прогнозов:', reply_markup=markup)
+
+async def choose_action_my_predict(query: CallbackQuery, callback_data: dict):
+    user: User = await user_add_or_update(query, role='analytic', module=__name__)
+    await query.answer()
+    config = query.bot.get('config')
+    db_session = query.bot.get('db')
+    analytic_id=query.from_user.id
+    ticker=callback_data.get('ticker')
+    markup= InlineKeyboardMarkup(row_width=3)
+    markup.insert(InlineKeyboardButton(text=f'🚫Отменить прогноз ${ticker}', callback_data=list_my_predicts_callback.new(ticker=ticker, action='confirm_delete')))
+    markup.row(InlineKeyboardButton(text='К списку моих прогнозов', callback_data=list_my_predicts_callback.new(ticker=ticker, action='back')))
+    markup.row(
+        InlineKeyboardButton('Main menu', callback_data=analytic_callback.new(action='main'))
+    )
+    await query.message.edit_text(text='Выберите действие:', reply_markup=markup)
+
+async def confirm_delete_my_predict(query: CallbackQuery, callback_data: dict):
+    user: User = await user_add_or_update(query, role='analytic', module=__name__)
+    await query.answer()
+    config = query.bot.get('config')
+    db_session = query.bot.get('db')
+    analytic_id = query.from_user.id
+    ticker = callback_data.get('ticker')
+    markup = InlineKeyboardMarkup(row_width=3)
+    markup.insert(InlineKeyboardButton(text=f'ДА, отменить ${ticker}',
+                                       callback_data=list_my_predicts_callback.new(ticker=ticker,
+                                                                                   action='delete')))
+    markup.row(InlineKeyboardButton(text='НЕТ, к списку моих прогнозов',
+                                    callback_data=list_my_predicts_callback.new(ticker=ticker, action='back')))
+    markup.row(
+        InlineKeyboardButton('Main menu', callback_data=analytic_callback.new(action='main'))
+    )
+    await query.message.edit_text(text=f'Точно отменить прогноз ${ticker}?', reply_markup=markup)
+
+async def delete_my_predict(query: CallbackQuery, callback_data: dict):
+    user: User = await user_add_or_update(query, role='analytic', module=__name__)
+    await query.answer()
+    config = query.bot.get('config')
+    db_session = query.bot.get('db')
+    analytic_id = query.from_user.id
+    ticker = callback_data.get('ticker')
+
+    predict = await Prediction.get_predict_analytic_ticker(db_session=db_session,
+                                                           ticker=ticker,
+                                                           analytic_id=analytic_id)
+    name = predict.name
+    start_value = predict.start_value
+    currency = predict.currency
+    start_date = predict.start_date
+    predicted_date = predict.predicted_date
+    analytic_nickname = predict.analytic.Nickname
+    analytic_rating = predict.analytic.rating
+    target = predict.predicted_value
+    analytic_predicts_total = predict.analytic.predicts_total
+    instrument = await tinkoff.search_by_ticker(ticker, config)
+    latestcost = await tinkoff.get_latest_cost_history(figi=instrument['figi'], config=config,
+                                                       to_time=datetime.utcnow())
+    analytic = await Analytic.get_analytic_by_id(db_session=db_session, telegram_id=analytic_id)
+    end_value=latestcost
+    end_date=datetime.utcnow()
+    await Prediction.update_predict(db_session,
+                                    successful=False,
+                                    end_value=end_value,
+                                    end_date=end_date,
+                                    id=predict.id)
+    updated_predict=await Prediction.get_predict_analytic_ticker(db_session=db_session,
+                                                                 ticker=ticker,
+                                                                 analytic_id=analytic_id)
+
+    prediction_rating = await updated_predict.calculate_rating(analytic)
+    try:
+        if analytic.bonuscount > 0:
+            bonuscount = analytic.bonuscount - 1
+            if bonuscount == 0:
+                await analytic.update_analytic(db_session=db_session, bonus=0, bonuscount=0)
+            else:
+                await analytic.update_analytic(db_session=db_session, bonuscount=bonuscount)
+    except TypeError:
+        pass
+
+    new_rating = await analytic.calculate_rating(prediction_rating)
+
+    await Analytic.set_analytic_rating(db_session, rating=new_rating, telegram_id=analytic_id)
+    await Prediction.update_predict_rating(db_session, id=predict.id, rating=prediction_rating)
+    updated_prediction = await Prediction.get_predict_by_id(db_session=db_session,
+                                                            id=predict.id)
+    updated_analytic = await Analytic.get_analytic_by_id(db_session=db_session, telegram_id=analytic_id)
+
+    profit = target - start_value
+    sign_profit = math.copysign(1, profit)
+    if sign_profit == -1:
+        circle = '🔴'
+    else:
+        circle = '🟢'
+    text = f'''Прогноз был отменен
+    🏦<b>${ticker}</b> ({name})
+    ⏱Дата начала: <b>{start_date.date():%d-%m-%Y}</b>                 
+    ⏱Дата окончания:  <b>{predicted_date.date():%d-%m-%Y}</b>
+    {circle}Прогноз: <b>{start_value} {currency}</b>➡<b>{target} {currency}</b>
+    Цена сейчас: <b>{latestcost} {currency}</b>
+    Аналитик: <b>{analytic_nickname}</b>
+    Новый рейтинг аналитика: <b>{new_rating}</b>'''
+
+    text_tochannel=f'''🚫🚫🚫Прогноз по акции <b>${updated_prediction.ticker}</b> БЫЛ ОТМЕНЕН!!! . 
+🏦Прогноз:<b>{updated_prediction.start_value} {updated_prediction.currency}</b>➡<b>{updated_prediction.predicted_value} {updated_prediction.currency}</b>
+Фактическое изменение: <b>{updated_prediction.start_value} {updated_prediction.currency}</b>➡<b>{updated_prediction.end_value} {updated_prediction.currency}</b>
+Рейтинг прогноза: <b>{updated_prediction.rating}</b>
+Рейтинг аналитика <b>{analytic.Nickname}</b>: <b>{analytic.rating}</b>➡<b>{updated_analytic.rating}</b>
+Всего прогнозов: <b>{updated_analytic.predicts_total}</b>.'''
+    markup = InlineKeyboardMarkup(row_width=3)
+    markup.insert(InlineKeyboardButton(text='К списку моих прогнозов',
+                                    callback_data=list_my_predicts_callback.new(ticker=ticker, action='back')))
+    markup.row(
+        InlineKeyboardButton('Main menu', callback_data=analytic_callback.new(action='main'))
+    )
+    # await query.message.answer(text=text)
+    channel_id = config.tg_bot.channel_id
+    await query.message.edit_text(text=text, reply_markup=markup)
+    await query.message.bot.send_message(chat_id=channel_id,
+                                   text=text_tochannel)
+
+
 def register_analytic(dp: Dispatcher):
     dp.register_callback_query_handler(first_menu, analytic_callback.filter(action='pred'), is_analytic=True, state="*", chat_type="private")
     dp.register_callback_query_handler(make_predict_button, analytic_callback.filter(action='pred_1'), is_analytic=True, state="*", chat_type="private")
     dp.register_callback_query_handler(get_invitelink, analytic_callback.filter(action='link'),  is_analytic=True, state="*", chat_type="private")
     dp.register_callback_query_handler(get_predict_list, analytic_callback.filter(action='pred_2'), is_analytic=True, state="*", chat_type="private")
+    dp.register_callback_query_handler(my_active_predicts,  analytic_callback.filter(action='pred_3'), is_analytic=True, state="*", chat_type="private")
+    dp.register_callback_query_handler(my_active_predicts, list_my_predicts_callback.filter(action='back'), is_analytic=True, state="*", chat_type="private")
+    dp.register_callback_query_handler(choose_action_my_predict, list_my_predicts_callback.filter(action='choose'), is_analytic=True, state="*", chat_type="private")
+    dp.register_callback_query_handler(confirm_delete_my_predict, list_my_predicts_callback.filter(action='confirm_delete'), is_analytic=True, state="*", chat_type="private")
+    dp.register_callback_query_handler(delete_my_predict, list_my_predicts_callback.filter(action='delete'), is_analytic=True, state="*", chat_type="private")
+
     dp.register_callback_query_handler(main_menu, analytic_callback.filter(action='main'), is_analytic=True, state="*", chat_type="private")
     dp.register_callback_query_handler(myinfo, analytic_callback.filter(action='myinfo'), state="*", chat_type="private")
     dp.register_message_handler(menu, commands=["menu"], state="*", is_analytic=True, chat_type="private")
