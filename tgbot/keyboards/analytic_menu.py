@@ -13,6 +13,7 @@ def main_menu_keyboard():
 def first_menu_keyboard():
     keyboard = [[InlineKeyboardButton('создать прогноз', callback_data=analytic_callback.new(action='pred_1'))],
                 [InlineKeyboardButton('список активных прогнозов', callback_data=analytic_callback.new(action='pred_2'))],
+                [InlineKeyboardButton('список моих активных прогнозов', callback_data=analytic_callback.new(action='pred_3'))],
                 [InlineKeyboardButton('Main menu', callback_data=analytic_callback.new(action='main'))]]
     return InlineKeyboardMarkup(inline_keyboard=keyboard)
 
