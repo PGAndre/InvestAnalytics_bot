@@ -91,6 +91,7 @@ async def main():
     scheduler.add_job(kick_users, "cron", hour='18')
     scheduler.add_job(notify_users_with_active_sub, "cron", hour='17')
     scheduler.add_job(notify_users_with_inactive_sub, "cron", hour='17')
+    logging.getLogger('apscheduler.executors.default').setLevel(logging.WARNING)
     #scheduler.add_job(kick_users, 'interval', seconds=5)
 
     #register_all_middlewares(dp)
