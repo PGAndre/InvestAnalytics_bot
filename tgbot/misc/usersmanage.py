@@ -30,7 +30,7 @@ async def kick_users():
             try:
                 await bot.send_message(chat_id=user_id,
                                        text=f'ваша подписка истекла. \nпройдите по ссылке для продления:', reply_markup=first_menu_keyboard())
-                logger.info(f'уведомление об исключчении из канала {channel_id} для {user._dict__}')
+                logger.info(f'уведомление об исключчении из канала {channel_id} для {user.__dict__}')
             except BotBlocked:
                 logger.exception(
                     f'нельзя отправить сообщение пользователю {user.__dict__}, т.к он отключил бота {botobj}')
