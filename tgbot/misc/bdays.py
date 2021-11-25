@@ -24,7 +24,9 @@ async def next_business_day(start_day, business_days):
     temp_day = start_day
     for i in range(0, business_days):
         next_day = temp_day + ONE_DAY
-        while next_day.weekday() in [5, 6] or np.datetime64(next_day) in holidays:
+        now_holiday = np.datetime64(next_day.date())
+        isholiday = now_holiday in holidays
+        while next_day.weekday() in [5, 6] or np.datetime64(next_day.date()) in holidays:
             next_day += ONE_DAY
         temp_day = next_day
     print(temp_day)
@@ -40,7 +42,7 @@ async def count_tdays(start_day, last_day):
     count = 0
     while temp_day < last_day:
         next_day = temp_day + ONE_DAY
-        if next_day.weekday() in [5, 6] or np.datetime64(next_day) in holidays:
+        if next_day.weekday() in [5, 6] or np.datetime64(next_day.date()) in holidays:
             temp_day = next_day
             continue
         count += 1
@@ -49,7 +51,7 @@ async def count_tdays(start_day, last_day):
     return count
 
 
-# asyncio.run(next_business_day(datetime(2021, 11, 23), 21))
-# asyncio.run(count_tdays(datetime(2021, 11, 23), datetime(2021, 12, 27)))
+asyncio.run(next_business_day(datetime.utcnow() + timedelta(days=-3), 4))
+# asyncio.run(count_tdays(datetime.utcnow() + timedelta(days=-1), datetime.utcnow() + timedelta(days=+1)))
 
 
