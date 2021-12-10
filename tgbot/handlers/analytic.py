@@ -351,17 +351,8 @@ async def publish(message: Message, state: FSMContext):
         circle='🟢'
 
     db_session = message.bot.get('db')
-    prediction: Prediction = await Prediction.add_predict(db_session=db_session,
-                                                          ticker=ticker,
-                                                          name=name,
-                                                          currency=currency,
-                                                          figi=figi,
-                                                          predicted_date=predicted_date,
-                                                          start_value=start_value,
-                                                          predicted_value=target,
-                                                          analytic_id=message.from_user.id)
-    text = f'''
-        🏦<b>${ticker}</b> ({name})
+
+    text = f'''🏦 <b>${ticker}</b> ({name})
 ⏱Дата окончания:  <b>{predicted_date.date():%d-%m-%Y}</b>
 {circle}Цена: <b>{start_value} {currency}</b>➡<b>{target} {currency}</b>
 Аналитик: <b>{analytic_nickname}</b>
@@ -373,8 +364,10 @@ async def publish(message: Message, state: FSMContext):
                          reply_markup=ReplyKeyboardRemove())
     channel_id = config.tg_bot.channel_id
     logger.info(f'{text}')
-    await message.bot.send_message(chat_id=channel_id,
+    channel_message = await message.bot.send_message(chat_id=channel_id,
                                    text=text)
+    edited_channel_message = await message.bot.edit_message_text(chat_id=channel_id,
+                                   text=text+f'\nСтатус:📈<b>АКТИВЕН</b>', message_id=channel_message.message_id)
     await message.bot.send_message(chat_id=channel_id,
                                    text=f'Пульс ${ticker}',
                                    reply_markup=InlineKeyboardMarkup(inline_keyboard=[
@@ -384,6 +377,19 @@ async def publish(message: Message, state: FSMContext):
                                        ],
                                    ])
                                    )
+    prediction: Prediction = await Prediction.add_predict(db_session=db_session,
+                                                          ticker=ticker,
+                                                          name=name,
+                                                          currency=currency,
+                                                          figi=figi,
+                                                          predicted_date=predicted_date,
+                                                          start_value=start_value,
+                                                          predicted_value=target,
+                                                          analytic_id=message.from_user.id,
+                                                          message_id=channel_message.message_id,
+                                                          message_url=channel_message.url,
+                                                          message_text=channel_message.html_text
+                                                          )
     await state.finish()
 
 
@@ -494,6 +500,10 @@ async def delete_my_predict(query: CallbackQuery, callback_data: dict):
     updated_prediction = await Prediction.get_predict_by_id(db_session=db_session,
                                                             id=predict.id)
     updated_analytic = await Analytic.get_analytic_by_id(db_session=db_session, telegram_id=analytic_id)
+    new_text=updated_prediction.message_text
+    new_text = new_text.replace("&lt;","<").replace("&gt;",">")
+    message_id=updated_prediction.message_id
+    message_url=updated_prediction.message_url
 
     profit = target - start_value
     sign_profit = math.copysign(1, profit)
@@ -510,23 +520,47 @@ async def delete_my_predict(query: CallbackQuery, callback_data: dict):
     Аналитик: <b>{analytic_nickname}</b>
     Новый рейтинг аналитика: <b>{new_rating}</b>'''
 
-    text_tochannel=f'''🚫🚫🚫Прогноз по акции <b>${updated_prediction.ticker}</b> БЫЛ ОТМЕНЕН!!! . 
+    if not message_id:
+        text_tochannel = f'''🚫🚫🚫Прогноз по акции <b>${updated_prediction.ticker}</b> БЫЛ ОТМЕНЕН!!! . 
 🏦Прогноз:<b>{updated_prediction.start_value} {updated_prediction.currency}</b>➡<b>{updated_prediction.predicted_value} {updated_prediction.currency}</b>
 Фактическое изменение: <b>{updated_prediction.start_value} {updated_prediction.currency}</b>➡<b>{updated_prediction.end_value} {updated_prediction.currency}</b>
 Рейтинг прогноза: <b>{updated_prediction.rating}</b>
 Рейтинг аналитика <b>{analytic.Nickname}</b>: <b>{analytic.rating}</b>➡<b>{updated_analytic.rating}</b>
 Всего прогнозов: <b>{updated_analytic.predicts_total}</b>.'''
-    markup = InlineKeyboardMarkup(row_width=3)
-    markup.insert(InlineKeyboardButton(text='К списку моих прогнозов',
-                                    callback_data=list_my_predicts_callback.new(ticker=ticker, action='back')))
-    markup.row(
-        InlineKeyboardButton('Main menu', callback_data=analytic_callback.new(action='main'))
-    )
-    # await query.message.answer(text=text)
-    channel_id = config.tg_bot.channel_id
-    await query.message.edit_text(text=text, reply_markup=markup)
-    await query.message.bot.send_message(chat_id=channel_id,
-                                   text=text_tochannel)
+        markup = InlineKeyboardMarkup(row_width=3)
+        markup.insert(InlineKeyboardButton(text='К списку моих прогнозов',
+                                           callback_data=list_my_predicts_callback.new(ticker=ticker, action='back')))
+        markup.row(
+            InlineKeyboardButton('Main menu', callback_data=analytic_callback.new(action='main'))
+        )
+        # await query.message.answer(text=text)
+        channel_id = config.tg_bot.channel_id
+        await query.message.edit_text(text=text, reply_markup=markup)
+        await query.message.bot.send_message(chat_id=channel_id,
+                                             text=text_tochannel)
+    else:
+        text_tochannel=f'''🚫🚫🚫Прогноз по акции <b><a href="{message_url}">${updated_prediction.ticker}</a></b> БЫЛ ОТМЕНЕН!!! . 
+🏦Прогноз:<b>{updated_prediction.start_value} {updated_prediction.currency}</b>➡<b>{updated_prediction.predicted_value} {updated_prediction.currency}</b>
+Фактическое изменение: <b>{updated_prediction.start_value} {updated_prediction.currency}</b>➡<b>{updated_prediction.end_value} {updated_prediction.currency}</b>
+Рейтинг прогноза: <b>{updated_prediction.rating}</b>
+Рейтинг аналитика <b>{analytic.Nickname}</b>: <b>{analytic.rating}</b>➡<b>{updated_analytic.rating}</b>
+Всего прогнозов: <b>{updated_analytic.predicts_total}</b>.'''
+        markup = InlineKeyboardMarkup(row_width=3)
+        markup.insert(InlineKeyboardButton(text='К списку моих прогнозов',
+                                        callback_data=list_my_predicts_callback.new(ticker=ticker, action='back')))
+        markup.row(
+            InlineKeyboardButton('Main menu', callback_data=analytic_callback.new(action='main'))
+        )
+        # await query.message.answer(text=text)
+        channel_id = config.tg_bot.channel_id
+        await query.message.edit_text(text=text, reply_markup=markup)
+
+        channel_message = await query.message.bot.send_message(chat_id=channel_id, text=text_tochannel)
+        await query.message.bot.edit_message_text(text=new_text+f'\nСтатус: <b>🚫<a href="{channel_message.url}">ОТМЕНЕН</a></b>' ,chat_id=channel_id, message_id=message_id)
+
+
+        # await query.message.bot.send_message(chat_id=channel_id,
+        #                                text=text_tochannel)
 
 
 def register_analytic(dp: Dispatcher):

@@ -112,6 +112,9 @@ class Prediction(Base):
     is_active = Column(Boolean, default=True, nullable=False)
     analytic = relationship("Analytic", backref="analytic", lazy="joined")
     successful = Column(Boolean, default=False)
+    message_id = Column(BigInteger, nullable=True)
+    message_url = Column(String(100), nullable=True)
+    message_text = Column(String(2000), nullable=True)
 
     @classmethod
     async def add_predict(cls,
@@ -123,7 +126,10 @@ class Prediction(Base):
                           predicted_date: datetime,
                           start_value: Numeric,
                           predicted_value: Numeric,
-                          analytic_id: BigInteger
+                          analytic_id: BigInteger,
+                          message_id: BigInteger,
+                          message_url: str,
+                          message_text: str
                           ) -> 'Prediction':
         prediction: Prediction = Prediction(ticker=ticker,
                                             name=name,
@@ -132,7 +138,10 @@ class Prediction(Base):
                                             predicted_date=predicted_date,
                                             start_value=start_value,
                                             predicted_value=predicted_value,
-                                            analytic_id=analytic_id)
+                                            analytic_id=analytic_id,
+                                            message_id=message_id,
+                                            message_url=message_url,
+                                            message_text=message_text)
         async with db_session() as db_session:
             db_session.add(prediction)
             await db_session.commit()
