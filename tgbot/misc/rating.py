@@ -166,7 +166,6 @@ async def predictions_active_finished():
         rating_delta = updated_analytic.rating - analytic.rating
         print(f' Аалитик: новое: {updated_analytic}, {updated_analytic.__dict__}')
         new_text = updated_prediction.message_text
-        new_text = new_text.replace("&lt;", "<").replace("&gt;", ">")
         message_id = updated_prediction.message_id
         message_url = updated_prediction.message_url
         if not message_id: #для старых прогнозов, где в базе нету message_id, message_url и текста
@@ -197,6 +196,7 @@ async def predictions_active_finished():
                                    ])
                                    )
         else: #для новых прогнозов с записью в базу ID сообщения, текста и url
+            new_text = new_text.replace("&lt;", "<").replace("&gt;", ">")
             if prediction.successful:
                 text_tochannel = f'''🚀Прогноз по акции <b><a href="{message_url}">${updated_prediction.ticker}</a></b> сбылся ⏱<b>{updated_prediction.end_date.date():%d-%m-%Y}</b>. 
 🏦Прогноз:<b>{updated_prediction.start_value} {updated_prediction.currency}</b>➡<b>{updated_prediction.end_value} {updated_prediction.currency}</b>

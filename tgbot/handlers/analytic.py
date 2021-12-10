@@ -501,7 +501,6 @@ async def delete_my_predict(query: CallbackQuery, callback_data: dict):
                                                             id=predict.id)
     updated_analytic = await Analytic.get_analytic_by_id(db_session=db_session, telegram_id=analytic_id)
     new_text=updated_prediction.message_text
-    new_text = new_text.replace("&lt;","<").replace("&gt;",">")
     message_id=updated_prediction.message_id
     message_url=updated_prediction.message_url
 
@@ -539,6 +538,7 @@ async def delete_my_predict(query: CallbackQuery, callback_data: dict):
         await query.message.bot.send_message(chat_id=channel_id,
                                              text=text_tochannel)
     else:
+        new_text = new_text.replace("&lt;", "<").replace("&gt;", ">")
         text_tochannel=f'''🚫🚫🚫Прогноз по акции <b><a href="{message_url}">${updated_prediction.ticker}</a></b> БЫЛ ОТМЕНЕН!!! . 
 🏦Прогноз:<b>{updated_prediction.start_value} {updated_prediction.currency}</b>➡<b>{updated_prediction.predicted_value} {updated_prediction.currency}</b>
 Фактическое изменение: <b>{updated_prediction.start_value} {updated_prediction.currency}</b>➡<b>{updated_prediction.end_value} {updated_prediction.currency}</b>
