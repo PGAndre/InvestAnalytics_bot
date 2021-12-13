@@ -165,32 +165,70 @@ async def predictions_active_finished():
         print(f'НОВЫЙ РЕЙТИНГ АНАЛИТИКА {updated_analytic.rating}')
         rating_delta = updated_analytic.rating - analytic.rating
         print(f' Аалитик: новое: {updated_analytic}, {updated_analytic.__dict__}')
-        if prediction.successful:
-            text = f'''🚀Прогноз по акции <b>${updated_prediction.ticker}</b> сбылся ⏱<b>{updated_prediction.end_date.date():%d-%m-%Y}</b>. 
+        new_text = updated_prediction.message_text
+        message_id = updated_prediction.message_id
+        message_url = updated_prediction.message_url
+        if not message_id: #для старых прогнозов, где в базе нету message_id, message_url и текста
+            if prediction.successful:
+                text = f'''🚀Прогноз по акции <b>${updated_prediction.ticker}</b> сбылся ⏱<b>{updated_prediction.end_date.date():%d-%m-%Y}</b>. 
 🏦Прогноз:<b>{updated_prediction.start_value} {updated_prediction.currency}</b>➡<b>{updated_prediction.end_value} {updated_prediction.currency}</b>
 Рейтинг Прогноза: <b>{updated_prediction.rating}</b>
 Рейтинг аналитика: <b>{analytic.Nickname}</b>: <b>{analytic.rating}</b>➡<b>{updated_analytic.rating}</b>
 Всего прогнозов: <b>{updated_analytic.predicts_total}</b>.'''
-        else:
-            text = f'''🚫Прогноз по акции <b>${updated_prediction.ticker}</b> не сбылся . 
+            else:
+                text = f'''🚫Прогноз по акции <b>${updated_prediction.ticker}</b> не сбылся . 
 🏦Прогноз:<b>{updated_prediction.start_value} {updated_prediction.currency}</b>➡<b>{updated_prediction.predicted_value} {updated_prediction.currency}</b>
 Фактическое изменение: <b>{updated_prediction.start_value} {updated_prediction.currency}</b>➡<b>{updated_prediction.end_value} {updated_prediction.currency}</b>
 Рейтинг прогноза: <b>{updated_prediction.rating}</b>
 Рейтинг аналитика <b>{analytic.Nickname}</b>: <b>{analytic.rating}</b>➡<b>{updated_analytic.rating}</b>
 Всего прогнозов: <b>{updated_analytic.predicts_total}</b>.'''
 
-        await bot.send_message(chat_id=channel_id,
-                               text=text)
+            await bot.send_message(chat_id=channel_id,
+                                   text=text)
 
-        await bot.send_message(chat_id=channel_id,
-                               text=f'Пульс ${updated_prediction.ticker}',
-                               reply_markup=InlineKeyboardMarkup(inline_keyboard=[
-                                   [
-                                       InlineKeyboardButton(text=f"Open in Tinkoff",
-                                                            url=f'https://www.tinkoff.ru/invest/stocks/{updated_prediction.ticker}')
-                                   ],
-                               ])
-                               )
+            await bot.send_message(chat_id=channel_id,
+                                   text=f'Пульс ${updated_prediction.ticker}',
+                                   reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+                                       [
+                                           InlineKeyboardButton(text=f"Open in Tinkoff",
+                                                                url=f'https://www.tinkoff.ru/invest/stocks/{updated_prediction.ticker}')
+                                       ],
+                                   ])
+                                   )
+        else: #для новых прогнозов с записью в базу ID сообщения, текста и url
+            new_text = new_text.replace("&lt;", "<").replace("&gt;", ">")
+            if prediction.successful:
+                text_tochannel = f'''🚀Прогноз по акции <b><a href="{message_url}">${updated_prediction.ticker}</a></b> сбылся ⏱<b>{updated_prediction.end_date.date():%d-%m-%Y}</b>. 
+🏦Прогноз:<b>{updated_prediction.start_value} {updated_prediction.currency}</b>➡<b>{updated_prediction.end_value} {updated_prediction.currency}</b>
+Рейтинг Прогноза: <b>{updated_prediction.rating}</b>
+Рейтинг аналитика: <b>{analytic.Nickname}</b>: <b>{analytic.rating}</b>➡<b>{updated_analytic.rating}</b>
+Всего прогнозов: <b>{updated_analytic.predicts_total}</b>.'''
+            else:
+                text_tochannel = f'''❌Прогноз по акции <b><a href="{message_url}">${updated_prediction.ticker}</a></b> не сбылся. 
+🏦Прогноз:<b>{updated_prediction.start_value} {updated_prediction.currency}</b>➡<b>{updated_prediction.predicted_value} {updated_prediction.currency}</b>
+Фактическое изменение: <b>{updated_prediction.start_value} {updated_prediction.currency}</b>➡<b>{updated_prediction.end_value} {updated_prediction.currency}</b>
+Рейтинг прогноза: <b>{updated_prediction.rating}</b>
+Рейтинг аналитика <b>{analytic.Nickname}</b>: <b>{analytic.rating}</b>➡<b>{updated_analytic.rating}</b>
+Всего прогнозов: <b>{updated_analytic.predicts_total}</b>.'''
+
+            channel_message = await bot.send_message(chat_id=channel_id,
+                                   text=text_tochannel)
+
+            await bot.send_message(chat_id=channel_id,
+                                   text=f'Пульс ${updated_prediction.ticker}',
+                                   reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+                                       [
+                                           InlineKeyboardButton(text=f"Open in Tinkoff",
+                                                                url=f'https://www.tinkoff.ru/invest/stocks/{updated_prediction.ticker}')
+                                       ],
+                                   ])
+                                   )
+            if prediction.successful:
+                await bot.edit_message_text(text=new_text + f'\nСтатус: 🚀<b><a href="{channel_message.url}">ЗАВЕРШЕН</a></b>',
+                    chat_id=channel_id, message_id=message_id)
+            else:
+                await bot.edit_message_text(text=new_text + f'\nСтатус: ❌<b><a href="{channel_message.url}">ЗАВЕРШЕН</a></b>',
+                    chat_id=channel_id, message_id=message_id)
 
 
 # noinspection PyTypeChecker

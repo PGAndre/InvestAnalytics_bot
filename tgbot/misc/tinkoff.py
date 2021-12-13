@@ -91,11 +91,11 @@ async def get_latest_cost_history(figi: str, config: Config, to_time: datetime):
                                                 config=config)
     # print(candles)
     if not candles.candles:
-        fromtime = datetime.utcnow() - timedelta(hours=10)
+        fromtime = to_time - timedelta(hours=10)
         candles: Candles = await get_market_candles(figi=figi, from_=fromtime, to=to_time,
                                                     interval=CandleResolution.min10, config=config)
         if not candles.candles:
-            fromtime = datetime.utcnow() - timedelta(hours=100)
+            fromtime = to_time - timedelta(hours=100)
             candles: Candles = await get_market_candles(figi=figi, from_=fromtime, to=to_time,
                                                         interval=CandleResolution.hour, config=config)
     # print(candles)
