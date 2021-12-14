@@ -2,6 +2,7 @@ import logging
 import math
 import pprint
 from datetime import datetime, timedelta
+from dateutil.relativedelta import relativedelta
 
 from aiogram import Dispatcher
 from aiogram.types import Message, InlineKeyboardButton, InlineKeyboardMarkup, CallbackQuery, callback_query, \
@@ -210,15 +211,16 @@ async def subscription_info(query: CallbackQuery):
 
 
 async def subscription_edit(query: CallbackQuery):
+    user: User = await user_add_or_update(query, role='user', module=__name__)
     await query.bot.send_invoice(query.from_user.id,
                                  **Ykassa_1month.generate_invoice(),
-                                 payload="1monthYkassa")
+                                 payload="1__month__ykassa")
     await query.bot.send_invoice(query.from_user.id,
                                  **Ykassa_2month.generate_invoice(),
-                                 payload="2monthYkassa")
+                                 payload="2__month__ykassa")
     await query.bot.send_invoice(query.from_user.id,
                                  **Ykassa_3month.generate_invoice(),
-                                 payload="3monthYkassa")
+                                 payload="3__month__ykassa")
     #await query.answer()
 
 async def process_pre_checkout_query(query: PreCheckoutQuery):
@@ -227,7 +229,31 @@ async def process_pre_checkout_query(query: PreCheckoutQuery):
     #print(answer)
 
 async def process_success_payment(query: SuccessfulPayment):
+    user: User = await user_add_or_update(query, role='user', module=__name__)
     print(query)
+    user_id = query.from_user.id
+    db_session = query.bot.get('db')
+    successful_payment = query.successful_payment
+    currency = successful_payment.currency
+    invoice_payload = successful_payment.invoice_payload
+    payload_splited = invoice_payload.split(sep="__")
+    ammount_sub = int(payload_splited[0])
+    provider = payload_splited[2]
+    provider_payment_charge_id = successful_payment.provider_payment_charge_id
+    telegram_payment_charge_id = successful_payment.telegram_payment_charge_id
+    total_amount = successful_payment.total_amount
+    try:
+        email = successful_payment.order_info.email
+    except:
+        email=None
+    current_subscription = user.subscription_until
+    if user.subscription_until > datetime.utcnow():
+        new_subscription = user.subscription_until + relativedelta(months=ammount_sub)
+    else:
+        new_subscription = datetime.utcnow() + relativedelta(months=ammount_sub)
+    updated_user: User = await user.update_user(db_session=db_session,
+                                                subscription_until=new_subscription)
+    updated_user: User = await User.get_user(db_session=db_session, telegram_id=user_id)
     print(query.__dict__)
 
 async def successful_payment(message: Message):
@@ -393,4 +419,4 @@ def register_botuser(dp: Dispatcher):
     dp.register_my_chat_member_handler(my_chat_member_update)
     dp.register_message_handler(user_start, commands=["start"], state="*", chat_type="private")
     dp.register_message_handler(user_help, commands=["help"], state="*", chat_type="private")
-    dp.register_message_handler(successful_payment, content_types = ContentType.SUCCESSFUL_PAYMENT)
+    dp.register_message_handler(process_success_payment, content_types = ContentType.SUCCESSFUL_PAYMENT)
