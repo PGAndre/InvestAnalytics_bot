@@ -5,6 +5,7 @@ class Predict(StatesGroup):
     Predict = State()
     Check_Ticker = State()
     Set_Date = State()
+    Set_Target = State()
     Confirm = State()
     Publish = State()
 
