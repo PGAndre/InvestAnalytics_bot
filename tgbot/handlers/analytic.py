@@ -125,7 +125,7 @@ async def predict_info(query: CallbackQuery, callback_data: dict):
     analytic_predicts_total=predict.analytic.predicts_total
     instrument = await tinkoff.search_by_ticker(ticker, config)
     latestcost = await tinkoff.get_latest_cost_history(figi=instrument['figi'], config=config,
-                                                       to_time=datetime.utcnow())
+                                                       to_time=datetime.utcnow()+timedelta(minutes=5))
     profit = target - start_value
     sign_profit = math.copysign(1, profit)
     if sign_profit == -1:
@@ -175,18 +175,23 @@ async def cancel(message: Message, state: FSMContext):
 async def back_to(message: Message, state: FSMContext):
     current_state = await state.get_state()
     if current_state == 'Predict:Set_Date':
-        await message.answer('возврат к вводу акции', reply_markup=ReplyKeyboardRemove())
+        await message.answer('Возврат к вводу акции', reply_markup=ReplyKeyboardRemove())
         await make_predict(message)
-    if current_state == 'Predict:Confirm':
-        await message.answer('возврат к вводу даты', reply_markup=ReplyKeyboardRemove())
+    if current_state == 'Predict:Set_Target':
+        await message.answer('Возврат к вводу даты', reply_markup=ReplyKeyboardRemove())
         async with state.proxy() as data:
             message.text = data['ticker']
         await check_ticker(message, state)
-    if current_state == 'Predict:Publish':
+    if current_state == 'Predict:Confirm':
         await message.answer('Возврат к вводу цели', reply_markup=ReplyKeyboardRemove())
         async with state.proxy() as data:
             message.text = data['predict_time']
         await set_date(message, state)
+    if current_state == 'Predict:Publish':
+        await message.answer('Возврат к вводу коментария', reply_markup=ReplyKeyboardRemove())
+        async with state.proxy() as data:
+            message.text = data['target']
+        await set_target(message, state)
 
 
 async def check_ticker(message: Message, state: FSMContext):
@@ -204,9 +209,12 @@ async def check_ticker(message: Message, state: FSMContext):
             await make_predict(message)
         else:
             latestcost = await tinkoff.get_latest_cost_history(figi=instrument['figi'], config=config,
-                                                               to_time=datetime.utcnow())
+                                                               to_time=datetime.utcnow()+timedelta(minutes=5))
             latestcost=float(latestcost)
-            text = f'Курс акции равен <b>{latestcost}</b>.\nВведите срок прогноза в днях(учитываются только торговые дни)'
+            text = f'''Курс акции равен <b>{latestcost}</b>.
+⚠️ВНИМАНИЕ: начальный курс акции будет скоректирован на актуальное значение на шаге подтверждения прогноза.⚠️
+Введите срок прогноза в днях(учитываются только торговые дни)
+'''
             await message.answer(text, reply_markup=reply.cancel_back_markup)
             await state.update_data(ticker=ticker.upper())
             await state.update_data(start_value=latestcost)
@@ -258,10 +266,12 @@ async def set_date(message: Message, state: FSMContext):
 
     # await state.update_data(predict_time=predict_time)
     await message.answer(f'Введите новую цель акции {ticker}', reply_markup=reply.cancel_back_markup)
-    await Predict.Confirm.set()
+    #await Predict.Confirm.set()
+    await Predict.Set_Target.set()
 
 
-async def confirm(message: Message, state: FSMContext):
+async def set_target(message: Message, state: FSMContext):
+    config = message.bot.get('config')
     # global target
     try:
         target = float(message.text)
@@ -275,6 +285,11 @@ async def confirm(message: Message, state: FSMContext):
 
     async with state.proxy() as data:
         start_value = data['start_value']
+        ticker = data['ticker']
+    instrument = await tinkoff.search_by_ticker(ticker, config)
+    latestcost = await tinkoff.get_latest_cost_history(figi=instrument['figi'], config=config,
+                                                       to_time=datetime.utcnow()+timedelta(minutes=5))
+    start_value=float(latestcost)
     profit = (target - start_value) * 100 / start_value
     if abs(profit) > 30:
         await message.answer('доходность прогноза не должна привышать 30%.')
@@ -294,10 +309,27 @@ async def confirm(message: Message, state: FSMContext):
         return
 
     # await message.answer(message)
+    async with state.proxy() as data:
+        data['target'] = target
+
+    await message.answer(f'Введите коментарий к прогнозу ${ticker}(по желанию)\n введите <b>0</b> (ноль) если не хотите оставлять коментарий', reply_markup=reply.cancel_back_markup)
+    await Predict.Confirm.set()
+
+
+async def confirm(message: Message, state: FSMContext):
+    config = message.bot.get('config')
+    comment = message.text
+    async with state.proxy() as data:
+        ticker = data['ticker']
+    instrument = await tinkoff.search_by_ticker(ticker, config)
+    latestcost = await tinkoff.get_latest_cost_history(figi=instrument['figi'], config=config,
+                                                       to_time=datetime.utcnow()+timedelta(minutes=5))
+    start_value=float(latestcost)
+
     db_session = message.bot.get('db')
     analytic: Analytic = await Analytic.get_analytic_by_id(db_session=db_session, telegram_id=message.from_user.id)
     async with state.proxy() as data:
-        data['target'] = target
+        data['comment'] = comment
         data['analytic_nickname'] = analytic.Nickname
         data['analytic_rating'] = float(analytic.rating)
         data['predicts_total'] = analytic.predicts_total
@@ -314,14 +346,26 @@ async def confirm(message: Message, state: FSMContext):
     else:
         circle='🟢'
 
-
-    text = f'''
-            🏦<b>${ticker}</b> ({name})
+    if comment == str(0):
+        text = f'''
+🏦<b>${ticker}</b> ({name})
 ⏱Дата окончания:  <b>{predicted_date.date():%d-%m-%Y}</b>
 {circle}Цена: <b>{start_value} {currency}</b>➡<b>{target} {currency}</b>
+⚠️ВНИМАНИЕ: начальный курс акции будет скоректирован на актуальное значение после нажатия на кнопку "опубликовать"⚠
 Аналитик: <b>{analytic.Nickname}</b>
 Рейтинг: <b>{analytic.rating}</b>
 Всего прогнозов: <b>{analytic.predicts_total}</b>'''
+    else:
+        text = f'''
+🏦<b>${ticker}</b> ({name})
+⏱Дата окончания:  <b>{predicted_date.date():%d-%m-%Y}</b>
+{circle}Цена: <b>{start_value} {currency}</b>➡<b>{target} {currency}</b>
+⚠️ВНИМАНИЕ: начальный курс акции будет скоректирован на актуальное значение после нажатия на кнопку "опубликовать"⚠
+Аналитик: <b>{analytic.Nickname}</b>
+Рейтинг: <b>{analytic.rating}</b>
+Всего прогнозов: <b>{analytic.predicts_total}</b>
+Коментарий к прогнозу: {comment}'''
+
 
 
     await message.answer(text=text, reply_markup=reply.confirm)
@@ -331,6 +375,7 @@ async def confirm(message: Message, state: FSMContext):
 async def publish(message: Message, state: FSMContext):
     config = message.bot.get('config')
     async with state.proxy() as data:
+        comment = data['comment']
         ticker = data['ticker']
         name = data['name']
         currency = data['currency']
@@ -342,6 +387,10 @@ async def publish(message: Message, state: FSMContext):
         analytic_rating = data['analytic_rating']
         analytic_predicts_total = data['predicts_total']
         predicted_date = await bdays.next_business_day(datetime.utcnow(), predict_time)
+        instrument = await tinkoff.search_by_ticker(ticker, config)
+        latestcost = await tinkoff.get_latest_cost_history(figi=instrument['figi'], config=config,
+                                                           to_time=datetime.utcnow()+timedelta(minutes=5))
+        start_value=float(latestcost)
 
     profit=target-start_value
     sign_profit = math.copysign(1, profit)
@@ -351,13 +400,21 @@ async def publish(message: Message, state: FSMContext):
         circle='🟢'
 
     db_session = message.bot.get('db')
-
-    text = f'''🏦 <b>${ticker}</b> ({name})
+    if comment == str(0):
+        text = f'''🏦 <b>${ticker}</b> ({name})
 ⏱Дата окончания:  <b>{predicted_date.date():%d-%m-%Y}</b>
 {circle}Цена: <b>{start_value} {currency}</b>➡<b>{target} {currency}</b>
 Аналитик: <b>{analytic_nickname}</b>
 Рейтинг: <b>{analytic_rating}</b>
 Всего прогнозов: <b>{analytic_predicts_total}</b>'''
+    else:
+        text = f'''🏦 <b>${ticker}</b> ({name})
+⏱Дата окончания:  <b>{predicted_date.date():%d-%m-%Y}</b>
+{circle}Цена: <b>{start_value} {currency}</b>➡<b>{target} {currency}</b>
+Аналитик: <b>{analytic_nickname}</b>
+Рейтинг: <b>{analytic_rating}</b>
+Всего прогнозов: <b>{analytic_predicts_total}</b>
+Коментарий к прогнозу: {comment}'''
     logger = logging.getLogger(__name__)
 
     await message.answer(text=text,
@@ -580,10 +637,11 @@ def register_analytic(dp: Dispatcher):
     dp.register_callback_query_handler(predict_info, predict_callback.filter(), is_analytic=True, state="*", chat_type="private")
     dp.register_message_handler(analytic_start, commands=["start"], state="*", is_analytic=True, chat_type="private")
     dp.register_message_handler(cancel, text="отменить",
-                                state=[Predict.Check_Ticker, Predict.Set_Date, Predict.Confirm, Predict.Publish])
-    dp.register_message_handler(back_to, text="назад", state=[Predict.Set_Date, Predict.Confirm, Predict.Publish])
+                                state=[Predict.Check_Ticker, Predict.Set_Date, Predict.Confirm, Predict.Publish, Predict.Set_Target])
+    dp.register_message_handler(back_to, text="назад", state=[Predict.Set_Date, Predict.Confirm, Predict.Publish, Predict.Set_Target])
     dp.register_message_handler(make_predict, text="/predict", state='*', is_analytic=True)
     dp.register_message_handler(check_ticker, state=Predict.Check_Ticker)
     dp.register_message_handler(set_date, state=Predict.Set_Date)
+    dp.register_message_handler(set_target, state=Predict.Set_Target)
     dp.register_message_handler(confirm, state=Predict.Confirm)
     dp.register_message_handler(publish, text="опубликовать", state=Predict.Publish)
