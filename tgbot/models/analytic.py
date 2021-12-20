@@ -316,8 +316,11 @@ class Prediction(Base):
         else:
             comments.sort(key=lambda r: r.created_date)
             comment_texts=[]
+            message_text = message_text + '\nКоментарии от аналитика:'
             for comment in comments:
-                text = f'\n<b><a href = "{comment.message_url}">Коментарий от {comment.created_date:%d-%m-%Y %H:%M}</a></b>'
+                comment_text = comment.comment[0:25] + '...'
+                # text = f'\n<b><a href = "{comment.message_url}">Коментарий от {comment.created_date:%d-%m-%Y %H:%M}</a></b>'
+                text = f'\n<b><a href = "{comment.message_url}">{comment_text}</a></b>'
                 message_text=message_text+text
                 comment_texts.append(comment.comment)
             message_text = message_text.replace("&lt;", "<").replace("&gt;", ">")
