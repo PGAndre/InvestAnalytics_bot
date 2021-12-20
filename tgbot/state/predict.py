@@ -5,6 +5,7 @@ class Predict(StatesGroup):
     Predict = State()
     Check_Ticker = State()
     Set_Date = State()
+    Set_Target = State()
     Confirm = State()
     Publish = State()
 
@@ -13,5 +14,10 @@ class Analytics(StatesGroup):
     Check_Analytic = State()
     Set_Nickname = State()
     Publish = State()
+
+class Predict_comment(StatesGroup):
+    Set_Comment = State()
+    Confirm = State()
+    Publish_Comment = State()
 
 

@@ -172,6 +172,7 @@ async def predict_info(query: CallbackQuery, callback_data: dict):
     instrument = await tinkoff.search_by_ticker(ticker, config)
     latestcost = await tinkoff.get_latest_cost_history(figi=instrument['figi'], config=config,
                                                        to_time=datetime.utcnow())
+    comment = predict.comment
     profit=target-start_value
     sign_profit = math.copysign(1, profit)
     if sign_profit==-1:
@@ -186,7 +187,8 @@ async def predict_info(query: CallbackQuery, callback_data: dict):
 Цена сейчас: <b>{latestcost} {currency}</b>
 Аналитик: <b>{analytic_nickname}</b>
 Рейтинг: <b>{analytic_rating}</b>
-Всего прогнозов: <b>{analytic_predicts_total}</b>'''
+Всего прогнозов: <b>{analytic_predicts_total}</b>
+Коментарий от аналитика: {comment}'''
 
     await query.message.answer(text=text,
                                    reply_markup=InlineKeyboardMarkup(inline_keyboard=[
