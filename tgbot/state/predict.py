@@ -15,4 +15,9 @@ class Analytics(StatesGroup):
     Set_Nickname = State()
     Publish = State()
 
+class Predict_comment(StatesGroup):
+    Set_Comment = State()
+    Confirm = State()
+    Publish_Comment = State()
+
 
