@@ -14,10 +14,10 @@ from tgbot.keyboards.analytic_menu import *
 from tgbot.keyboards.callback_datas import predict_callback, list_my_predicts_callback
 from tgbot.misc.misc import user_add_or_update
 
-from tgbot.models.analytic import Prediction, Analytic
+from tgbot.models.analytic import Prediction, Analytic, Prediction_comment
 from tgbot.keyboards import reply
 from tgbot.models.users import User
-from tgbot.state.predict import Predict
+from tgbot.state.predict import Predict, Predict_comment
 from tgbot.misc import tinkoff, bdays
 
 
@@ -125,7 +125,7 @@ async def predict_info(query: CallbackQuery, callback_data: dict):
     analytic_predicts_total=predict.analytic.predicts_total
     instrument = await tinkoff.search_by_ticker(ticker, config)
     latestcost = await tinkoff.get_latest_cost_history(figi=instrument['figi'], config=config,
-                                                       to_time=datetime.utcnow())
+                                                       to_time=datetime.utcnow()+timedelta(minutes=5))
     profit = target - start_value
     sign_profit = math.copysign(1, profit)
     if sign_profit == -1:
@@ -168,25 +168,30 @@ async def make_predict(message: Message):
 #     await Predict.Check_Ticker.set()
 
 async def cancel(message: Message, state: FSMContext):
-    await message.answer('выход из прогноза', reply_markup=ReplyKeyboardRemove())
+    await message.answer('Выход из прогноза', reply_markup=ReplyKeyboardRemove())
     await state.finish()
 
 
 async def back_to(message: Message, state: FSMContext):
     current_state = await state.get_state()
     if current_state == 'Predict:Set_Date':
-        await message.answer('возврат к вводу акции', reply_markup=ReplyKeyboardRemove())
+        await message.answer('Возврат к вводу акции', reply_markup=ReplyKeyboardRemove())
         await make_predict(message)
-    if current_state == 'Predict:Confirm':
-        await message.answer('возврат к вводу даты', reply_markup=ReplyKeyboardRemove())
+    if current_state == 'Predict:Set_Target':
+        await message.answer('Возврат к вводу даты', reply_markup=ReplyKeyboardRemove())
         async with state.proxy() as data:
             message.text = data['ticker']
         await check_ticker(message, state)
-    if current_state == 'Predict:Publish':
+    if current_state == 'Predict:Confirm':
         await message.answer('Возврат к вводу цели', reply_markup=ReplyKeyboardRemove())
         async with state.proxy() as data:
             message.text = data['predict_time']
         await set_date(message, state)
+    if current_state == 'Predict:Publish':
+        await message.answer('Возврат к вводу коментария', reply_markup=ReplyKeyboardRemove())
+        async with state.proxy() as data:
+            message.text = data['target']
+        await set_target(message, state)
 
 
 async def check_ticker(message: Message, state: FSMContext):
@@ -204,9 +209,12 @@ async def check_ticker(message: Message, state: FSMContext):
             await make_predict(message)
         else:
             latestcost = await tinkoff.get_latest_cost_history(figi=instrument['figi'], config=config,
-                                                               to_time=datetime.utcnow())
+                                                               to_time=datetime.utcnow()+timedelta(minutes=5))
             latestcost=float(latestcost)
-            text = f'Курс акции равен <b>{latestcost}</b>.\nВведите срок прогноза в днях(учитываются только торговые дни)'
+            text = f'''Курс акции равен <b>{latestcost}</b>.
+⚠️ВНИМАНИЕ: начальный курс акции будет скоректирован на актуальное значение на шаге подтверждения прогноза.⚠️
+Введите срок прогноза в днях(учитываются только торговые дни)
+'''
             await message.answer(text, reply_markup=reply.cancel_back_markup)
             await state.update_data(ticker=ticker.upper())
             await state.update_data(start_value=latestcost)
@@ -258,10 +266,12 @@ async def set_date(message: Message, state: FSMContext):
 
     # await state.update_data(predict_time=predict_time)
     await message.answer(f'Введите новую цель акции {ticker}', reply_markup=reply.cancel_back_markup)
-    await Predict.Confirm.set()
+    #await Predict.Confirm.set()
+    await Predict.Set_Target.set()
 
 
-async def confirm(message: Message, state: FSMContext):
+async def set_target(message: Message, state: FSMContext):
+    config = message.bot.get('config')
     # global target
     try:
         target = float(message.text)
@@ -275,6 +285,11 @@ async def confirm(message: Message, state: FSMContext):
 
     async with state.proxy() as data:
         start_value = data['start_value']
+        ticker = data['ticker']
+    instrument = await tinkoff.search_by_ticker(ticker, config)
+    latestcost = await tinkoff.get_latest_cost_history(figi=instrument['figi'], config=config,
+                                                       to_time=datetime.utcnow()+timedelta(minutes=5))
+    start_value=float(latestcost)
     profit = (target - start_value) * 100 / start_value
     if abs(profit) > 30:
         await message.answer('доходность прогноза не должна привышать 30%.')
@@ -294,10 +309,27 @@ async def confirm(message: Message, state: FSMContext):
         return
 
     # await message.answer(message)
+    async with state.proxy() as data:
+        data['target'] = target
+
+    await message.answer(f'Введите коментарий к прогнозу ${ticker}(по желанию)\n введите <b>0</b> (ноль) если не хотите оставлять коментарий', reply_markup=reply.cancel_back_markup)
+    await Predict.Confirm.set()
+
+
+async def confirm(message: Message, state: FSMContext):
+    config = message.bot.get('config')
+    comment = message.text
+    async with state.proxy() as data:
+        ticker = data['ticker']
+    instrument = await tinkoff.search_by_ticker(ticker, config)
+    latestcost = await tinkoff.get_latest_cost_history(figi=instrument['figi'], config=config,
+                                                       to_time=datetime.utcnow()+timedelta(minutes=5))
+    start_value=float(latestcost)
+
     db_session = message.bot.get('db')
     analytic: Analytic = await Analytic.get_analytic_by_id(db_session=db_session, telegram_id=message.from_user.id)
     async with state.proxy() as data:
-        data['target'] = target
+        data['comment'] = comment
         data['analytic_nickname'] = analytic.Nickname
         data['analytic_rating'] = float(analytic.rating)
         data['predicts_total'] = analytic.predicts_total
@@ -314,14 +346,26 @@ async def confirm(message: Message, state: FSMContext):
     else:
         circle='🟢'
 
-
-    text = f'''
-            🏦<b>${ticker}</b> ({name})
+    if comment == str(0):
+        text = f'''
+🏦<b>${ticker}</b> ({name})
 ⏱Дата окончания:  <b>{predicted_date.date():%d-%m-%Y}</b>
 {circle}Цена: <b>{start_value} {currency}</b>➡<b>{target} {currency}</b>
+⚠️ВНИМАНИЕ: начальный курс акции будет скоректирован на актуальное значение после нажатия на кнопку "опубликовать"⚠
 Аналитик: <b>{analytic.Nickname}</b>
 Рейтинг: <b>{analytic.rating}</b>
 Всего прогнозов: <b>{analytic.predicts_total}</b>'''
+    else:
+        text = f'''
+🏦<b>${ticker}</b> ({name})
+⏱Дата окончания:  <b>{predicted_date.date():%d-%m-%Y}</b>
+{circle}Цена: <b>{start_value} {currency}</b>➡<b>{target} {currency}</b>
+⚠️ВНИМАНИЕ: начальный курс акции будет скоректирован на актуальное значение после нажатия на кнопку "опубликовать"⚠
+Аналитик: <b>{analytic.Nickname}</b>
+Рейтинг: <b>{analytic.rating}</b>
+Всего прогнозов: <b>{analytic.predicts_total}</b>
+Коментарий к прогнозу: {comment}'''
+
 
 
     await message.answer(text=text, reply_markup=reply.confirm)
@@ -331,6 +375,7 @@ async def confirm(message: Message, state: FSMContext):
 async def publish(message: Message, state: FSMContext):
     config = message.bot.get('config')
     async with state.proxy() as data:
+        comment = data['comment']
         ticker = data['ticker']
         name = data['name']
         currency = data['currency']
@@ -342,6 +387,10 @@ async def publish(message: Message, state: FSMContext):
         analytic_rating = data['analytic_rating']
         analytic_predicts_total = data['predicts_total']
         predicted_date = await bdays.next_business_day(datetime.utcnow(), predict_time)
+        instrument = await tinkoff.search_by_ticker(ticker, config)
+        latestcost = await tinkoff.get_latest_cost_history(figi=instrument['figi'], config=config,
+                                                           to_time=datetime.utcnow()+timedelta(minutes=5))
+        start_value=float(latestcost)
 
     profit=target-start_value
     sign_profit = math.copysign(1, profit)
@@ -351,13 +400,21 @@ async def publish(message: Message, state: FSMContext):
         circle='🟢'
 
     db_session = message.bot.get('db')
-
-    text = f'''🏦 <b>${ticker}</b> ({name})
+    if comment == str(0):
+        text = f'''🏦 <b>${ticker}</b> ({name})
 ⏱Дата окончания:  <b>{predicted_date.date():%d-%m-%Y}</b>
 {circle}Цена: <b>{start_value} {currency}</b>➡<b>{target} {currency}</b>
 Аналитик: <b>{analytic_nickname}</b>
 Рейтинг: <b>{analytic_rating}</b>
 Всего прогнозов: <b>{analytic_predicts_total}</b>'''
+    else:
+        text = f'''🏦 <b>${ticker}</b> ({name})
+⏱Дата окончания:  <b>{predicted_date.date():%d-%m-%Y}</b>
+{circle}Цена: <b>{start_value} {currency}</b>➡<b>{target} {currency}</b>
+Аналитик: <b>{analytic_nickname}</b>
+Рейтинг: <b>{analytic_rating}</b>
+Всего прогнозов: <b>{analytic_predicts_total}</b>
+Коментарий к прогнозу: {comment}'''
     logger = logging.getLogger(__name__)
 
     await message.answer(text=text,
@@ -388,7 +445,8 @@ async def publish(message: Message, state: FSMContext):
                                                           analytic_id=message.from_user.id,
                                                           message_id=channel_message.message_id,
                                                           message_url=channel_message.url,
-                                                          message_text=channel_message.html_text
+                                                          message_text=channel_message.html_text,
+                                                          comment=comment
                                                           )
     await state.finish()
 
@@ -421,8 +479,9 @@ async def choose_action_my_predict(query: CallbackQuery, callback_data: dict):
     db_session = query.bot.get('db')
     analytic_id=query.from_user.id
     ticker=callback_data.get('ticker')
-    markup= InlineKeyboardMarkup(row_width=3)
+    markup= InlineKeyboardMarkup(row_width=1)
     markup.insert(InlineKeyboardButton(text=f'🚫Отменить прогноз ${ticker}', callback_data=list_my_predicts_callback.new(ticker=ticker, action='confirm_delete')))
+    markup.insert(InlineKeyboardButton(text=f'📝Добавить коментарий в прогноз ${ticker}', callback_data=list_my_predicts_callback.new(ticker=ticker, action='add_comment')))
     markup.row(InlineKeyboardButton(text='К списку моих прогнозов', callback_data=list_my_predicts_callback.new(ticker=ticker, action='back')))
     markup.row(
         InlineKeyboardButton('Main menu', callback_data=analytic_callback.new(action='main'))
@@ -500,7 +559,8 @@ async def delete_my_predict(query: CallbackQuery, callback_data: dict):
     updated_prediction = await Prediction.get_predict_by_id(db_session=db_session,
                                                             id=predict.id)
     updated_analytic = await Analytic.get_analytic_by_id(db_session=db_session, telegram_id=analytic_id)
-    new_text=updated_prediction.message_text
+    # new_text=updated_prediction.message_text
+    new_text = await updated_prediction.edit_message_text(db_session=db_session)
     message_id=updated_prediction.message_id
     message_url=updated_prediction.message_url
 
@@ -538,7 +598,7 @@ async def delete_my_predict(query: CallbackQuery, callback_data: dict):
         await query.message.bot.send_message(chat_id=channel_id,
                                              text=text_tochannel)
     else:
-        new_text = new_text.replace("&lt;", "<").replace("&gt;", ">")
+        # new_text = new_text.replace("&lt;", "<").replace("&gt;", ">")
         text_tochannel=f'''🚫🚫🚫Прогноз по акции <b><a href="{message_url}">${updated_prediction.ticker}</a></b> БЫЛ ОТМЕНЕН!!! . 
 🏦Прогноз:<b>{updated_prediction.start_value} {updated_prediction.currency}</b>➡<b>{updated_prediction.predicted_value} {updated_prediction.currency}</b>
 Фактическое изменение: <b>{updated_prediction.start_value} {updated_prediction.currency}</b>➡<b>{updated_prediction.end_value} {updated_prediction.currency}</b>
@@ -562,6 +622,140 @@ async def delete_my_predict(query: CallbackQuery, callback_data: dict):
         # await query.message.bot.send_message(chat_id=channel_id,
         #                                text=text_tochannel)
 
+async def cancel_comment(message: Message, state: FSMContext):
+    await message.answer('выход из коментария', reply_markup=ReplyKeyboardRemove())
+    await state.finish()
+
+async def comment_back_to(message: Message, state: FSMContext):
+    current_state = await state.get_state()
+    if current_state == 'Predict_comment:Publish_Comment':
+        await message.answer('Возврат к вводу коментария', reply_markup=ReplyKeyboardRemove())
+        query: CallbackQuery = CallbackQuery()
+        callback_data = {}
+        async with state.proxy() as data:
+            callback_data['ticker'] = data['ticker']
+        await add_comment_my_predict(query=query, callback_data=callback_data)
+    # if current_state == 'Predict:Set_Target':
+    #     await message.answer('Возврат к вводу даты', reply_markup=ReplyKeyboardRemove())
+    #     async with state.proxy() as data:
+    #         message.text = data['ticker']
+    #     await check_ticker(message, state)
+    # if current_state == 'Predict:Confirm':
+    #     await message.answer('Возврат к вводу цели', reply_markup=ReplyKeyboardRemove())
+    #     async with state.proxy() as data:
+    #         message.text = data['predict_time']
+    #     await set_date(message, state)
+    # if current_state == 'Predict:Publish':
+    #     await message.answer('Возврат к вводу коментария', reply_markup=ReplyKeyboardRemove())
+    #     async with state.proxy() as data:
+    #         message.text = data['target']
+    #     await set_target(message, state)
+
+async def add_comment_my_predict(query: CallbackQuery, callback_data: dict):
+    user: User = await user_add_or_update(query, role='analytic', module=__name__)
+    await query.answer()
+    await Predict_comment.Set_Comment.set()
+    state = Dispatcher.get_current().current_state()
+    config = query.bot.get('config')
+    db_session = query.bot.get('db')
+    analytic_id = query.from_user.id
+    ticker = callback_data.get('ticker')
+    prediction = await Prediction.get_predict_analytic_ticker(db_session=db_session,
+                                                           ticker=ticker,
+                                                           analytic_id=analytic_id)
+
+
+    comments_raw = await Prediction_comment.get_comments_by_predict(db_session=db_session, prediction_id=prediction.id)
+    comments = []
+    max_comments = 3
+    comment_count=0
+    for comment in comments_raw:
+        print(comment)
+        comments.append(comment)
+        comment_count+=1
+        print(comments)
+    comments_avaliable = max_comments - comment_count
+    if comments_avaliable <= 0:
+        await query.message.answer(f'К прогнозу нельзя добавить больше {max_comments}х коментариев', reply_markup=ReplyKeyboardRemove())
+        await state.finish()
+        return
+    start = f'{prediction.start_date.date():%d-%m-%Y}'
+    async with state.proxy() as data:
+        data['ticker']=ticker
+        data['analytic_id']=analytic_id
+        data['analytic_nickname']=prediction.analytic.Nickname
+        data['start_date']=start
+        data['prediction_url']=prediction.message_url
+        data['prediction_id']=prediction.id
+        data['message_id']=prediction.message_id
+        data['message_text']=prediction.message_text
+    await query.message.answer(f'Вы можете оставить еще {comments_avaliable} коментария к прогнозу <b>${ticker}</b>\n'
+                               f'Введите текст коментария:', reply_markup=reply.cancel)
+    await Predict_comment.Confirm.set()
+
+
+async def set_comment_my_predict(message: Message, state: FSMContext):
+    config = message.bot.get('config')
+    comment = message.text
+    async with state.proxy() as data:
+        ticker = data['ticker']
+        analytic_nickname = data['analytic_nickname']
+        data['comment'] = comment
+        start_date = data['start_date']
+        prediction_url=data['prediction_url']
+    channel_id = config.tg_bot.channel_id
+
+    text = f'''Аналитик <b>{analytic_nickname}</b> добавил коментарий к прогнозу по акции \n🏦<b><a href="{prediction_url}">${ticker}</a></b> от <b>{start_date}</b>   :
+{comment}'''
+
+    async with state.proxy() as data:
+        data['text'] = text
+        data['comment'] = comment
+
+
+    await message.answer(text=f'<b>Текст опубликованного сообщения будет:</b>\n' + text, reply_markup=reply.confirm_no_back)
+    await Predict_comment.Publish_Comment.set()
+        # channel_message = await message.bot.send_message(chat_id=channel_id,
+        #                                text=comment)
+
+async def publish_comment(message: Message, state: FSMContext):
+    config = message.bot.get('config')
+    async with state.proxy() as data:
+        text_tochannel = data['text']
+        analytic_nickname = data['analytic_nickname']
+        prediction_id = data['prediction_id']
+        comment = data['comment']
+        message_id = data['message_id']
+        message_text = data['message_text']
+    channel_id = config.tg_bot.channel_id
+    await message.answer(text=text_tochannel,
+                         reply_markup=ReplyKeyboardRemove())
+    channel_message = await message.bot.send_message(chat_id=channel_id,
+                                                     text=text_tochannel)
+    db_session = message.bot.get('db')
+    prediction_comment =await Prediction_comment.add_prediction_comment(db_session = db_session,
+                                                                   prediction_id = prediction_id,
+                                                                   comment = comment,
+                                                                   message_id=channel_message.message_id,
+                                                                   message_url=channel_message.url
+                                                                   )
+
+    prediction: Prediction = await Prediction.get_predict_by_id(db_session=db_session, id=prediction_id)
+    new_text = await prediction.edit_message_text(db_session=db_session)
+
+    #new_text = message_text + f'\nДобавлен коментарий:'
+    await message.bot.edit_message_text(text=new_text + f'\nСтатус:📈<b>АКТИВЕН</b>',
+                                chat_id=channel_id, message_id=message_id)
+
+    await state.finish()
+
+
+
+
+
+
+
+
 
 def register_analytic(dp: Dispatcher):
     dp.register_callback_query_handler(first_menu, analytic_callback.filter(action='pred'), is_analytic=True, state="*", chat_type="private")
@@ -572,6 +766,12 @@ def register_analytic(dp: Dispatcher):
     dp.register_callback_query_handler(my_active_predicts, list_my_predicts_callback.filter(action='back'), is_analytic=True, state="*", chat_type="private")
     dp.register_callback_query_handler(choose_action_my_predict, list_my_predicts_callback.filter(action='choose'), is_analytic=True, state="*", chat_type="private")
     dp.register_callback_query_handler(confirm_delete_my_predict, list_my_predicts_callback.filter(action='confirm_delete'), is_analytic=True, state="*", chat_type="private")
+    # dp.register_message_handler(comment_back_to, text="назад", state=Predict_comment.Publish_Comment)
+    dp.register_message_handler(cancel_comment, text="отменить",
+                                state=[Predict_comment.Set_Comment, Predict_comment.Confirm, Predict_comment.Publish_Comment])
+    dp.register_callback_query_handler(add_comment_my_predict, list_my_predicts_callback.filter(action='add_comment'), is_analytic=True, state="*", chat_type="private")
+    dp.register_message_handler(set_comment_my_predict, state=Predict_comment.Confirm, chat_type="private")
+    dp.register_message_handler(publish_comment, text="опубликовать", state=Predict_comment.Publish_Comment, chat_type="private")
     dp.register_callback_query_handler(delete_my_predict, list_my_predicts_callback.filter(action='delete'), is_analytic=True, state="*", chat_type="private")
 
     dp.register_callback_query_handler(main_menu, analytic_callback.filter(action='main'), is_analytic=True, state="*", chat_type="private")
@@ -580,10 +780,13 @@ def register_analytic(dp: Dispatcher):
     dp.register_callback_query_handler(predict_info, predict_callback.filter(), is_analytic=True, state="*", chat_type="private")
     dp.register_message_handler(analytic_start, commands=["start"], state="*", is_analytic=True, chat_type="private")
     dp.register_message_handler(cancel, text="отменить",
-                                state=[Predict.Check_Ticker, Predict.Set_Date, Predict.Confirm, Predict.Publish])
-    dp.register_message_handler(back_to, text="назад", state=[Predict.Set_Date, Predict.Confirm, Predict.Publish])
+                                state=[Predict.Check_Ticker, Predict.Set_Date, Predict.Confirm, Predict.Publish, Predict.Set_Target])
+
+    dp.register_message_handler(back_to, text="назад", state=[Predict.Set_Date, Predict.Confirm, Predict.Publish, Predict.Set_Target])
     dp.register_message_handler(make_predict, text="/predict", state='*', is_analytic=True)
     dp.register_message_handler(check_ticker, state=Predict.Check_Ticker)
     dp.register_message_handler(set_date, state=Predict.Set_Date)
+    dp.register_message_handler(set_target, state=Predict.Set_Target)
     dp.register_message_handler(confirm, state=Predict.Confirm)
     dp.register_message_handler(publish, text="опубликовать", state=Predict.Publish)
+

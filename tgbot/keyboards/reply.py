@@ -31,6 +31,18 @@ confirm = ReplyKeyboardMarkup(
     resize_keyboard=True
 )
 
+confirm_no_back = ReplyKeyboardMarkup(
+    keyboard=[
+        [
+            KeyboardButton(text="отменить")
+        ],
+        [
+            KeyboardButton(text="опубликовать")
+        ]
+    ],
+    resize_keyboard=True
+)
+
 cancel = ReplyKeyboardMarkup(
     keyboard=[
         [

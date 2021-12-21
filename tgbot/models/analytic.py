@@ -115,6 +115,7 @@ class Prediction(Base):
     message_id = Column(BigInteger, nullable=True)
     message_url = Column(String(100), nullable=True)
     message_text = Column(String(2000), nullable=True)
+    comment = Column(String(4000), nullable=True)
 
     @classmethod
     async def add_predict(cls,
@@ -129,7 +130,8 @@ class Prediction(Base):
                           analytic_id: BigInteger,
                           message_id: BigInteger,
                           message_url: str,
-                          message_text: str
+                          message_text: str,
+                          comment: str
                           ) -> 'Prediction':
         prediction: Prediction = Prediction(ticker=ticker,
                                             name=name,
@@ -141,7 +143,8 @@ class Prediction(Base):
                                             analytic_id=analytic_id,
                                             message_id=message_id,
                                             message_url=message_url,
-                                            message_text=message_text)
+                                            message_text=message_text,
+                                            comment=comment)
         async with db_session() as db_session:
             db_session.add(prediction)
             await db_session.commit()
@@ -299,8 +302,69 @@ class Prediction(Base):
         print(f'RATING: {rating_rounded}')
         return rating_rounded
 
+    async def edit_message_text(self,
+                                db_session: sessionmaker) -> str:
+        message_text = self.message_text
+        comments_raw = await Prediction_comment.get_comments_by_predict(db_session=db_session,
+                                                                        prediction_id=self.id)
+        comments = []
+        for comment in comments_raw:
+            comments.append(comment)
 
+        if not comments:
+            return message_text
+        else:
+            comments.sort(key=lambda r: r.created_date)
+            comment_texts=[]
+            message_text = message_text + '\nКоментарии от аналитика:'
+            for comment in comments:
+                comment_text = comment.comment[0:25] + '...'
+                # text = f'\n<b><a href = "{comment.message_url}">Коментарий от {comment.created_date:%d-%m-%Y %H:%M}</a></b>'
+                text = f'\n<b><a href = "{comment.message_url}">{comment_text}</a></b>'
+                message_text=message_text+text
+                comment_texts.append(comment.comment)
+            message_text = message_text.replace("&lt;", "<").replace("&gt;", ">")
+            return message_text
 
+class Prediction_comment(Base):
+    __tablename__ = 'Predicts_comments'
+
+    id = Column(Integer, primary_key=True, autoincrement="auto")
+    prediction_id = Column(BigInteger, ForeignKey(Prediction.id, ondelete="CASCADE"), nullable=False)
+    comment = Column(String(4000), nullable=True)
+    predict = relationship("Prediction", backref="predict", lazy="joined")
+    created_date = Column(DateTime, default=datetime.datetime.utcnow)
+    updated_date = Column(DateTime(timezone=True), onupdate=func.now())
+    message_id = Column(BigInteger, nullable=True)
+    message_url = Column(String(100), nullable=True)
+
+    @classmethod
+    async def get_comments_by_predict(cls,
+                          db_session: sessionmaker,
+                          prediction_id: BigInteger ):
+        async with db_session() as db_session:
+            sql = select(cls).where(cls.prediction_id == prediction_id)
+            request = await db_session.execute(sql)
+            predict: cls = request.scalars()
+            return predict
+
+    @classmethod
+    async def add_prediction_comment(cls,
+                                  db_session: sessionmaker,
+                                  prediction_id: BigInteger,
+                                  comment: str,
+                                  message_id: BigInteger,
+                                  message_url: str
+                                  ) -> 'Prediction':
+        prediction_comment: Prediction_comment = Prediction_comment(prediction_id = prediction_id,
+                                                            comment = comment,
+                                                            message_id = message_id,
+                                                            message_url = message_url
+                                                            )
+        async with db_session() as db_session:
+            db_session.add(prediction_comment)
+            await db_session.commit()
+            return prediction_comment
         #E = (1 + sign(r) * power((D - d) / (D - 1), 1 / 3) * power(p / P, 1 / 3) * power(min( | r |, p) / p, 1 / 3)) / 2
 
 
