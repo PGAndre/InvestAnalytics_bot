@@ -115,8 +115,9 @@ async def latestcost(figi: str, config: Config):
     client = tinvest.AsyncClient(tcs_token)
     OrderbookResponse = await client.get_market_orderbook(figi=figi, depth=1)
     latestcost = OrderbookResponse.payload.last_price
+    await client.close()
     return latestcost
-    print(OrderbookResponse)
+    # print(OrderbookResponse)
 
 
 async def get_candles_inrange(figi: str, from_: datetime, to: datetime, interval: str, config: Config)  -> Candles:
