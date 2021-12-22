@@ -305,6 +305,7 @@ class Prediction(Base):
     async def edit_message_text(self,
                                 db_session: sessionmaker) -> str:
         message_text = self.message_text
+        message_text = message_text.replace("&lt;", "<").replace("&gt;", ">")
         comments_raw = await Prediction_comment.get_comments_by_predict(db_session=db_session,
                                                                         prediction_id=self.id)
         comments = []
@@ -323,7 +324,6 @@ class Prediction(Base):
                 text = f'\n<b><a href = "{comment.message_url}">{comment_text}</a></b>'
                 message_text=message_text+text
                 comment_texts.append(comment.comment)
-            message_text = message_text.replace("&lt;", "<").replace("&gt;", ">")
             return message_text
 
 class Prediction_comment(Base):
