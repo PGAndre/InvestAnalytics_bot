@@ -214,6 +214,47 @@ async def subscription_info(query: CallbackQuery):
 
 async def subscription_edit(query: CallbackQuery):
     user: User = await user_add_or_update(query, role='user', module=__name__)
+    payload = '1__month'
+    title = 'Подписка на 1 месяц'
+    description = 'Подписка на 1 месяц на канал SosisochniePrognozi'
+    currency = 'RUB'
+    price = 100.00
+    ammount_labaledPrice = int(price * 100.00)
+
+    provider_data = {
+        "receipt": {
+            "items": [
+                {
+                    "description": description,
+                    "quantity": "1.00",
+                    "amount": {
+                        "value": price,
+                        "currency": currency
+                    },
+                    "vat_code": "2",
+                }
+            ]
+        }
+    }
+
+    ykassa_invoice = Ykassa_payment(title=title,
+                                    description=description,
+                                    currency=currency,
+                                    prices=[
+                                        LabeledPrice(
+                                            label="subscription",
+                                            amount=ammount_labaledPrice
+                                        )
+                                    ],
+                                    provider_data=provider_data,
+                                    start_parameter="create_invoice_sosisochnyi",
+                                    need_email=True,
+                                    send_email_to_provider=True
+                                    )
+    await query.bot.send_invoice(query.from_user.id,
+                                 **ykassa_invoice.generate_invoice(),
+                                 payload=payload+'__ykassa')
+
     await query.bot.send_invoice(query.from_user.id,
                                  **Ykassa_1month.generate_invoice(),
                                  payload="1__month__ykassa")
@@ -256,7 +297,6 @@ async def process_success_payment(query: SuccessfulPayment):
     updated_user: User = await user.update_user(db_session=db_session,
                                                 subscription_until=new_subscription)
     updated_user: User = await User.get_user(db_session=db_session, telegram_id=user_id)
-    print(query.__dict__)
 
 async def successful_payment(message: Message):
     print(message)
