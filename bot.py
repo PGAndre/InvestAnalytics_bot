@@ -21,7 +21,8 @@ from tgbot.handlers.channeluser import register_channeluser
 from tgbot.handlers.user import register_user
 from tgbot.middlewares.db import DbMiddleware
 from tgbot.misc.rating import calculate_rating_job
-from tgbot.misc.usersmanage import kick_users, notify_users_with_active_sub, notify_users_with_inactive_sub
+from tgbot.misc.usersmanage import kick_users, notify_users_with_active_sub, notify_users_with_inactive_sub, \
+    kick_users_notmember
 from tgbot.services.database import create_db_session
 
 logger = logging.getLogger(__name__)
@@ -97,7 +98,11 @@ async def main():
     scheduler.add_job(kick_users, "cron", hour='18')
     scheduler.add_job(notify_users_with_active_sub, "cron", hour='17')
     scheduler.add_job(notify_users_with_inactive_sub, "cron", hour='17')
-    logging.getLogger('apscheduler.executors.default').setLevel(logging.WARNING)
+    trigger_kick_notmembers = OrTrigger([
+        CronTrigger(hour='0-23', minute='*/10'),
+    ])
+    scheduler.add_job(kick_users_notmember, trigger_kick_notmembers)
+    logging.getLogger('apscheduler.executors.default').setLevel(logging.INFO)
     #scheduler.add_job(kick_users, 'interval', seconds=5)
 
     #register_all_middlewares(dp)
