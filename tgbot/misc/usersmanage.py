@@ -20,9 +20,10 @@ async def kick_users():
     channel_id = config.tg_bot.channel_id
     botobj = await bot.get_me()
     botname = botobj.username
+    logger = logging.getLogger(__name__)
 
     for user in users:
-        logger = logging.getLogger(__name__)
+        await asyncio.sleep(0.05)
         user_id = user.telegram_id
         await bot.kick_chat_member(chat_id=channel_id, user_id=user_id, until_date=timedelta(seconds=31))
         logger.info(f'пользователь {user.__dict__} был исключен из канала в связи с истекшей подпиской')
@@ -35,6 +36,25 @@ async def kick_users():
                 logger.exception(
                     f'нельзя отправить сообщение пользователю {user.__dict__}, т.к он отключил бота {botobj}')
 
+
+# запускать каждый день!
+async def kick_users_notmember():
+    config: Config = load_config()
+    db_session = await create_db_session(config)
+    users = await User.get_users_member(db_session=db_session, is_member=False)
+    bot = Bot(token=config.tg_bot.token, parse_mode='HTML')
+    channel_id = config.tg_bot.channel_id
+    botobj = await bot.get_me()
+    botname = botobj.username
+    logger = logging.getLogger(__name__)
+    for user in users:
+        user_id = user.telegram_id
+        try:
+            await bot.kick_chat_member(chat_id=channel_id, user_id=user_id, until_date=timedelta(seconds=31))
+            # logger.info(f'пользователь {user.__dict__} был исключен из канала в связи с тем, что не был занесен в базу')
+        except:
+            logger.exception(
+                f'нельзя кикнуть пользователя {user.__dict__}, т.к он уже покинул чат {botobj}')
 
 # запускать каждый день
 async def notify_users_with_active_sub():
@@ -100,7 +120,7 @@ async def notify_users_with_inactive_sub():
 #     bot = Bot(token=config.tg_bot.token, parse_mode='HTML')
 #     await bot.
 
-
+# asyncio.run(kick_users_notmember())
 # asyncio.run(notify_users_with_active_sub())
 # asyncio.run(notify_users_with_inactive_sub())
 # asyncio.run(kick_users())
