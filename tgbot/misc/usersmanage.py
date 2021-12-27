@@ -58,7 +58,7 @@ async def notify_users_with_active_sub():
             user_id = user.telegram_id
             try:
                 await bot.send_message(chat_id=user_id,
-                                       text=f'ваша подписка истекает {user.subscription_until.date()}\nпройдите по ссылке для продления:', reply_markup=first_menu_keyboard())
+                                       text=f'ваша подписка истекает {user.subscription_until.date():%d-%m-%Y}\nпройдите по ссылке для продления:', reply_markup=first_menu_keyboard())
                 logger.info(f'уведомление об истекающей подписке на канал {channel_id} для {user.__dict__}')
             except BotBlocked:
                 await user.update_user(db_session=db_session,

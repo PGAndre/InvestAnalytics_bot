@@ -2,6 +2,7 @@ import logging
 import math
 import pprint
 from datetime import datetime, timedelta
+
 from dateutil.relativedelta import relativedelta
 
 from aiogram import Dispatcher
@@ -19,6 +20,7 @@ from tgbot.misc import misc, tinkoff
 from tgbot.misc.misc import user_add_or_update
 from tgbot.misc.subscriptions import *
 from tgbot.models.analytic import Prediction, Analytic
+from tgbot.models.orders import Product, PaymentInfo
 from tgbot.models.users import User
 
 
@@ -214,7 +216,51 @@ async def subscription_info(query: CallbackQuery):
 
 async def subscription_edit(query: CallbackQuery):
     user: User = await user_add_or_update(query, role='user', module=__name__)
-    payload = '1__month'
+    db_session = query.bot.get('db')
+    # subscription_products: Product = await Product.get_product_like_payload(db_session=db_session)
+    # for subscription_product in subscription_products:
+    #     payload = subscription_product.payload
+    #     title = subscription_product.title
+    #     description = subscription_product.description
+    #     currency = subscription_product.currency
+    #     price = float(subscription_product.price)
+    #     ammount_labaledPrice = int(price * 100.00)
+    #
+    #     provider_data = {
+    #         "receipt": {
+    #             "items": [
+    #                 {
+    #                     "description": description,
+    #                     "quantity": "1.00",
+    #                     "amount": {
+    #                         "value": price,
+    #                         "currency": currency
+    #                     },
+    #                     "vat_code": "2",
+    #                 }
+    #             ]
+    #         }
+    #     }
+    #
+    #     ykassa_invoice = Ykassa_payment(title=title,
+    #                                     description=description,
+    #                                     currency=currency,
+    #                                     prices=[
+    #                                         LabeledPrice(
+    #                                             label="subscription",
+    #                                             amount=ammount_labaledPrice
+    #                                         )
+    #                                     ],
+    #                                     provider_data=provider_data,
+    #                                     start_parameter="create_invoice_sosisochnyi",
+    #                                     need_email=True,
+    #                                     send_email_to_provider=True
+    #                                     )
+    #     await query.bot.send_invoice(query.from_user.id,
+    #                                  **ykassa_invoice.generate_invoice(),
+    #                                  payload=payload+'__ykassa_telegram')
+
+    payload = 'subscription__1__month'
     title = 'Подписка на 1 месяц'
     description = 'Подписка на 1 месяц на канал SosisochniePrognozi'
     currency = 'RUB'
@@ -253,18 +299,18 @@ async def subscription_edit(query: CallbackQuery):
                                     )
     await query.bot.send_invoice(query.from_user.id,
                                  **ykassa_invoice.generate_invoice(),
-                                 payload=payload+'__ykassa')
+                                 payload=payload+'__ykassa_telegram')
 
     await query.bot.send_invoice(query.from_user.id,
                                  **Ykassa_1month.generate_invoice(),
-                                 payload="1__month__ykassa")
+                                 payload="subscription__1__month__ykassa")
     await query.bot.send_invoice(query.from_user.id,
                                  **Ykassa_2month.generate_invoice(),
-                                 payload="2__month__ykassa")
+                                 payload="subscription__2__month__ykassa")
     await query.bot.send_invoice(query.from_user.id,
                                  **Ykassa_3month.generate_invoice(),
-                                 payload="3__month__ykassa")
-    #await query.answer()
+                                 payload="subscription__3__month__ykassa")
+    await query.answer()
 
 async def process_pre_checkout_query(query: PreCheckoutQuery):
     await query.bot.send_message(chat_id=query.from_user.id, text="Спасибо за подписку!")
@@ -280,8 +326,8 @@ async def process_success_payment(query: SuccessfulPayment):
     currency = successful_payment.currency
     invoice_payload = successful_payment.invoice_payload
     payload_splited = invoice_payload.split(sep="__")
-    ammount_sub = int(payload_splited[0])
-    provider = payload_splited[2]
+    ammount_sub = int(payload_splited[1])
+    provider = payload_splited[3]
     provider_payment_charge_id = successful_payment.provider_payment_charge_id
     telegram_payment_charge_id = successful_payment.telegram_payment_charge_id
     total_amount = successful_payment.total_amount
@@ -297,6 +343,20 @@ async def process_success_payment(query: SuccessfulPayment):
     updated_user: User = await user.update_user(db_session=db_session,
                                                 subscription_until=new_subscription)
     updated_user: User = await User.get_user(db_session=db_session, telegram_id=user_id)
+
+    paymentinfo: PaymentInfo = await PaymentInfo.add_paymentinfo(db_session=db_session,
+                                      user_id=user_id,
+                                      email=email,
+                                      provider=provider,
+                                      provider_payment_charge_id=provider_payment_charge_id,
+                                      telegram_payment_charge_id=telegram_payment_charge_id,
+                                      invoice_payload=invoice_payload,
+                                      total_amount=float(total_amount/100),
+                                      currency=currency)
+    getpaymentinfo: PaymentInfo = await PaymentInfo.get_paymentinfo_by_provider_payment_charge_id(db_session=db_session,
+                                                                                                  provider_payment_charge_id=provider_payment_charge_id)
+
+    print(getpaymentinfo)
 
 async def successful_payment(message: Message):
     print(message)

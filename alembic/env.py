@@ -8,7 +8,7 @@ from sqlalchemy import engine_from_config, MetaData
 from sqlalchemy import pool
 from tgbot.models.analytic import Analytic, Prediction
 from tgbot.models.users import User
-from tgbot.models.orders import Product
+from tgbot.models.orders import Product, PaymentInfo
 from alembic import context
 from tgbot.config import load_config, Config
 
