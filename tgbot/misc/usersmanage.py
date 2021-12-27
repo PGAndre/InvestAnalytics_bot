@@ -56,8 +56,8 @@ async def kick_users_notmember():
             # await bot.kick_chat_member(chat_id=channel_id, user_id=user_id, until_date=timedelta(seconds=60))
             # logger.info(f'пользователь {user.__dict__} был исключен из канала в связи с тем, что не был занесен в базу')
         except:
-            logger.exception(
-                f'нельзя кикнуть пользователя {user.__dict__}, т.к он уже покинул чат {botobj}')
+            logger.info(
+                f'нельзя кикнуть пользователя, т.к он уже покинул чат  {user.__dict__}{botobj}')
 
 # запускать каждый день
 async def notify_users_with_active_sub():
