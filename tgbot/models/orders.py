@@ -25,9 +25,10 @@ class Product(Base):
 
     @classmethod
     async def get_product_like_payload(cls,
-                                db_session: sessionmaker):
+                                db_session: sessionmaker,
+                                payload=str):
         async with db_session() as db_session:
-            sql = select(cls).where(cls.payload.like('%subscription%'))
+            sql = select(cls).where(cls.payload.like(f'%{payload}%'))
             request = await db_session.execute(sql)
             prediction: cls = request.scalars()
             return prediction
@@ -44,6 +45,8 @@ class PaymentInfo(Base):
     invoice_payload = Column(String(length=200), nullable=False)
     total_amount = Column(Numeric(12, 2), nullable=False)
     currency = Column(String(length=10), default='RUB', nullable=False)
+    created_date = Column(DateTime, default=datetime.datetime.utcnow)
+    updated_date = Column(DateTime, onupdate=func.now())
     __table_args__ = (UniqueConstraint('provider', 'provider_payment_charge_id', name='_provider_paimentid_uc'),)
 
     @classmethod
@@ -72,14 +75,16 @@ class PaymentInfo(Base):
             return paymentinfo
 
     @classmethod
-    async def get_paymentinfo_by_provider_payment_charge_id(cls,
+    async def get_paymentinfo_by_charge_id_provider(cls,
                           db_session: sessionmaker,
-                          provider_payment_charge_id: str) -> 'PaymentInfo':
+                          provider_payment_charge_id: str,
+                          provider: str) -> 'PaymentInfo':
         async with db_session() as db_session:
-            sql = select(cls).where(func.lower(cls.provider_payment_charge_id) == func.lower(provider_payment_charge_id))
+            sql = select(cls).where(func.lower(cls.provider_payment_charge_id) == func.lower(provider_payment_charge_id))\
+                             .where(func.lower(cls.provider) == func.lower(provider))
             request = await db_session.execute(sql)
-            predict: cls = request.scalar()
-            return predict
+            paymentinfo: cls = request.scalar()
+            return paymentinfo
 
 
 

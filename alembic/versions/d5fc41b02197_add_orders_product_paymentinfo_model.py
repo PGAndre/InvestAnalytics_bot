@@ -1,8 +1,8 @@
 """add orders\Product,PaymentInfo model
 
-Revision ID: decfbe22d131
+Revision ID: d5fc41b02197
 Revises: aa23a1c23f5c
-Create Date: 2021-12-27 04:32:08.836853
+Create Date: 2021-12-27 18:13:07.665528
 
 """
 from alembic import op
@@ -10,7 +10,7 @@ import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
-revision = 'decfbe22d131'
+revision = 'd5fc41b02197'
 down_revision = 'aa23a1c23f5c'
 branch_labels = None
 depends_on = None
@@ -39,6 +39,8 @@ def upgrade():
     sa.Column('invoice_payload', sa.String(length=200), nullable=False),
     sa.Column('total_amount', sa.Numeric(precision=12, scale=2), nullable=False),
     sa.Column('currency', sa.String(length=10), nullable=False),
+    sa.Column('created_date', sa.DateTime(), nullable=True),
+    sa.Column('updated_date', sa.DateTime(), nullable=True),
     sa.ForeignKeyConstraint(['user_id'], ['Users.telegram_id'], ondelete='CASCADE'),
     sa.PrimaryKeyConstraint('id'),
     sa.UniqueConstraint('provider', 'provider_payment_charge_id', name='_provider_paimentid_uc')
