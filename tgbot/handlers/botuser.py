@@ -3,6 +3,8 @@ import math
 import pprint
 from datetime import datetime, timedelta
 
+from dateutil.relativedelta import relativedelta
+
 from aiogram import Dispatcher
 from aiogram.types import Message, InlineKeyboardButton, InlineKeyboardMarkup, CallbackQuery, callback_query, \
     PreCheckoutQuery, SuccessfulPayment, ContentType
@@ -18,6 +20,7 @@ from tgbot.misc import misc, tinkoff
 from tgbot.misc.misc import user_add_or_update
 from tgbot.misc.subscriptions import *
 from tgbot.models.analytic import Prediction, Analytic
+from tgbot.models.orders import Product, PaymentInfo
 from tgbot.models.users import User
 
 
@@ -102,7 +105,7 @@ async def list_analytics(query: CallbackQuery):
             InlineKeyboardButton(text=button_text, callback_data=callback_data)
         )
     markup.row(
-        InlineKeyboardButton('Main menu', callback_data=user_callback.new(action='main'))
+        InlineKeyboardButton('Главное меню', callback_data=user_callback.new(action='main'))
     )
     await query.message.edit_text(text='Список аналитиков:', reply_markup=markup)
 
@@ -124,7 +127,7 @@ async def get_predict_list(query: CallbackQuery):
     user: User = await user_add_or_update(query, role='user', module=__name__)
     if user.subscription_until < datetime.utcnow():
         await query.message.edit_text(
-            f"Hello, {user.username} ! \n Ваша подписка истекла. Обновите подписку для получения ссылки на канал.", reply_markup=first_menu_keyboard())
+            f"Здравствуйте! \nВаша подписка истекла. Обновите подписку для получения ссылки на канал.", reply_markup=first_menu_keyboard())
         return
     await query.answer()
     config = query.bot.get('config')
@@ -140,7 +143,7 @@ async def get_predict_list(query: CallbackQuery):
             InlineKeyboardButton(text=button_text, callback_data=callback_data)
         )
     markup.row(
-        InlineKeyboardButton('Main menu', callback_data=user_callback.new(action='main'))
+        InlineKeyboardButton('Главное меню', callback_data=user_callback.new(action='main'))
     )
     await query.message.edit_text(text='Список активных прогнозов:', reply_markup=markup)
 
@@ -149,7 +152,7 @@ async def predict_info(query: CallbackQuery, callback_data: dict):
     user: User = await user_add_or_update(query, role='user', module=__name__)
     if user.subscription_until < datetime.utcnow():
         await query.message.edit_text(
-            f"Hello, {user.username} ! \n Ваша подписка истекла. Обновите подписку для получения ссылки на канал.", reply_markup=first_menu_keyboard())
+            f"Здравствуйте! \nВаша подписка истекла. Обновите подписку для получения ссылки на канал.", reply_markup=first_menu_keyboard())
         return
     config = query.bot.get('config')
     db_session = query.bot.get('db')
@@ -212,25 +215,152 @@ async def subscription_info(query: CallbackQuery):
 
 
 async def subscription_edit(query: CallbackQuery):
-    await query.bot.send_invoice(query.from_user.id,
-                                 **Ykassa_1month.generate_invoice(),
-                                 payload="1monthYkassa")
-    await query.bot.send_invoice(query.from_user.id,
-                                 **Ykassa_2month.generate_invoice(),
-                                 payload="2monthYkassa")
-    await query.bot.send_invoice(query.from_user.id,
-                                 **Ykassa_3month.generate_invoice(),
-                                 payload="3monthYkassa")
-    #await query.answer()
+    user: User = await user_add_or_update(query, role='user', module=__name__)
+    db_session = query.bot.get('db')
+    subscription_products: Product = await Product.get_product_like_payload(db_session=db_session, payload='subscription')
+    for subscription_product in subscription_products:
+        payload = subscription_product.payload
+        title = subscription_product.title
+        description = subscription_product.description
+        currency = subscription_product.currency
+        price = float(subscription_product.price)
+        ammount_labaledPrice = int(price * 100.00)
+
+        provider_data = {
+            "receipt": {
+                "items": [
+                    {
+                        "description": description,
+                        "quantity": "1.00",
+                        "amount": {
+                            "value": price,
+                            "currency": currency
+                        },
+                        "vat_code": "2",
+                    }
+                ]
+            }
+        }
+
+        ykassa_invoice = Ykassa_payment(title=title,
+                                        description=description,
+                                        currency=currency,
+                                        prices=[
+                                            LabeledPrice(
+                                                label="subscription",
+                                                amount=ammount_labaledPrice
+                                            )
+                                        ],
+                                        provider_data=provider_data,
+                                        start_parameter="create_invoice_sosisochnyi",
+                                        need_email=True,
+                                        send_email_to_provider=True
+                                        )
+        await query.bot.send_invoice(query.from_user.id,
+                                     **ykassa_invoice.generate_invoice(),
+                                     payload=payload+'__ykassa_telegram')
+
+    # payload = 'subscription__1__month'
+    # title = 'Подписка на 1 месяц'
+    # description = 'Подписка на 1 месяц на канал SosisochniePrognozi'
+    # currency = 'RUB'
+    # price = 100.00
+    # ammount_labaledPrice = int(price * 100.00)
+    #
+    # provider_data = {
+    #     "receipt": {
+    #         "items": [
+    #             {
+    #                 "description": description,
+    #                 "quantity": "1.00",
+    #                 "amount": {
+    #                     "value": price,
+    #                     "currency": currency
+    #                 },
+    #                 "vat_code": "2",
+    #             }
+    #         ]
+    #     }
+    # }
+    #
+    # ykassa_invoice = Ykassa_payment(title=title,
+    #                                 description=description,
+    #                                 currency=currency,
+    #                                 prices=[
+    #                                     LabeledPrice(
+    #                                         label="subscription",
+    #                                         amount=ammount_labaledPrice
+    #                                     )
+    #                                 ],
+    #                                 provider_data=provider_data,
+    #                                 start_parameter="create_invoice_sosisochnyi",
+    #                                 need_email=True,
+    #                                 send_email_to_provider=True
+    #                                 )
+    # await query.bot.send_invoice(query.from_user.id,
+    #                              **ykassa_invoice.generate_invoice(),
+    #                              payload=payload+'__ykassa_telegram')
+    #
+    # await query.bot.send_invoice(query.from_user.id,
+    #                              **Ykassa_1month.generate_invoice(),
+    #                              payload="subscription__1__month__ykassa")
+    # await query.bot.send_invoice(query.from_user.id,
+    #                              **Ykassa_2month.generate_invoice(),
+    #                              payload="subscription__2__month__ykassa")
+    # await query.bot.send_invoice(query.from_user.id,
+    #                              **Ykassa_3month.generate_invoice(),
+    #                              payload="subscription__3__month__ykassa")
+    await query.answer()
 
 async def process_pre_checkout_query(query: PreCheckoutQuery):
-    await query.bot.send_message(chat_id=query.from_user.id, text="Спасибо за подписку!")
+    # await query.bot.send_message(chat_id=query.from_user.id, text="Спасибо за подписку!")
     await query.bot.answer_pre_checkout_query(pre_checkout_query_id=query.id, ok=True)
     #print(answer)
 
 async def process_success_payment(query: SuccessfulPayment):
-    print(query)
-    print(query.__dict__)
+    user: User = await user_add_or_update(query, role='user', module=__name__)
+    user_id = query.from_user.id
+    db_session = query.bot.get('db')
+    successful_payment = query.successful_payment
+    currency = successful_payment.currency
+    invoice_payload = successful_payment.invoice_payload
+    payload_splited = invoice_payload.split(sep="__")
+    ammount_sub = int(payload_splited[1])
+    provider = payload_splited[3]
+    provider_payment_charge_id = successful_payment.provider_payment_charge_id
+    telegram_payment_charge_id = successful_payment.telegram_payment_charge_id
+    total_amount = successful_payment.total_amount
+    try:
+        email = successful_payment.order_info.email
+    except:
+        email=None
+    current_subscription = user.subscription_until
+    if user.subscription_until > datetime.utcnow():
+        new_subscription = user.subscription_until + relativedelta(months=ammount_sub)
+    else:
+        new_subscription = datetime.utcnow() + relativedelta(months=ammount_sub)
+    updated_user: User = await user.update_user(db_session=db_session,
+                                                subscription_until=new_subscription)
+    keyboard_link = [[InlineKeyboardButton('🚀 Получить ссылку на канал', callback_data=user_callback.new(action='link'))],
+                     [InlineKeyboardButton('Главное меню', callback_data=user_callback.new(action='main'))]]
+    link_markup = InlineKeyboardMarkup(inline_keyboard=keyboard_link)
+    await query.bot.send_message(chat_id=query.from_user.id, text="Спасибо за подписку! Нажмите на кнопку для получения ссылки на канал", reply_markup=link_markup)
+    logger = logging.getLogger(__name__)
+    logger.info(
+        f'пользователь {user.telegram_id}, {user.username}, {user.first_name}, {email} произвёл оплату на {float(total_amount)/100} {currency} за {invoice_payload}')
+    updated_user: User = await User.get_user(db_session=db_session, telegram_id=user_id)
+
+    paymentinfo: PaymentInfo = await PaymentInfo.add_paymentinfo(db_session=db_session,
+                                      user_id=user_id,
+                                      email=email,
+                                      provider=provider,
+                                      provider_payment_charge_id=provider_payment_charge_id,
+                                      telegram_payment_charge_id=telegram_payment_charge_id,
+                                      invoice_payload=invoice_payload,
+                                      total_amount=float(total_amount/100),
+                                      currency=currency)
+    getpaymentinfo: PaymentInfo = await PaymentInfo.get_paymentinfo_by_charge_id_provider(db_session=db_session,
+                                                                                                  provider_payment_charge_id=provider_payment_charge_id, provider=provider)
 
 async def successful_payment(message: Message):
     print(message)
@@ -255,15 +385,15 @@ async def get_invitelink(query: CallbackQuery):
 
     if user.subscription_until < datetime.utcnow():
         await query.message.edit_text(
-            f"Hello, {username} ! \n Ваша подписка истекла. Обновите подписку для получения ссылки на канал.",
+            f"Здравствуйте! \nВаша подписка истекла. Обновите подписку для получения ссылки на канал.",
     reply_markup=first_menu_keyboard())
     elif user.is_member == True:
         await query.message.answer(
-            f"Hello, {username} ! \n Вы уже являетесь подписчиком канала.")
+            f"Здравствуйте! \nВы уже являетесь подписчиком канала.")
     else:
         invite_link = await query.bot.create_chat_invite_link(chat_id=config.tg_bot.channel_id,
                                                                 expire_date=timedelta(hours=1))
-        await query.message.answer(f"Hello, {username} ! \n Ваша ссылка для входа в канал: {invite_link.invite_link}")
+        await query.message.answer(f"Здравствуйте! \nВаша ссылка для входа в канал: {invite_link.invite_link}")
 
 async def user_help(message: Message):
     user: User = await user_add_or_update(message, role='user', module=__name__)
@@ -274,7 +404,7 @@ async def user_help(message: Message):
 async def user_start(message: Message):
     user: User = await user_add_or_update(message, role='user', module=__name__)
     await message.answer(
-            f'''Hello, {user.username} !
+            f'''Здравствуйте!
 /menu - чтобы попасть в основное меню
 /help - Информация.
 ''')
@@ -395,4 +525,4 @@ def register_botuser(dp: Dispatcher):
     dp.register_my_chat_member_handler(my_chat_member_update)
     dp.register_message_handler(user_start, commands=["start"], state="*", chat_type="private")
     dp.register_message_handler(user_help, commands=["help"], state="*", chat_type="private")
-    dp.register_message_handler(successful_payment, content_types = ContentType.SUCCESSFUL_PAYMENT)
+    dp.register_message_handler(process_success_payment, content_types = ContentType.SUCCESSFUL_PAYMENT)
