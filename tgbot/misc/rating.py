@@ -166,7 +166,7 @@ async def predictions_active_finished():
         rating_delta = updated_analytic.rating - analytic.rating
         print(f' Аалитик: новое: {updated_analytic}, {updated_analytic.__dict__}')
         # new_text = updated_prediction.message_text
-        new_text = await updated_prediction.edit_message_text(db_session=db_session)
+
         message_id = updated_prediction.message_id
         message_url = updated_prediction.message_url
         if not message_id: #для старых прогнозов, где в базе нету message_id, message_url и текста
@@ -224,6 +224,8 @@ async def predictions_active_finished():
                                        ],
                                    ])
                                    )
+
+            new_text = await updated_prediction.edit_message_text(db_session=db_session)
             if prediction.successful:
                 await bot.edit_message_text(text=new_text + f'\nСтатус: 🚀<b><a href="{channel_message.url}">ЗАВЕРШЕН</a></b>',
                     chat_id=channel_id, message_id=message_id)
