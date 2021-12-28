@@ -9,6 +9,7 @@ from sqlalchemy import pool
 from tgbot.models.analytic import Analytic, Prediction
 from tgbot.models.users import User
 from tgbot.models.orders import Product, PaymentInfo
+from tgbot.models.admin import Document
 from alembic import context
 from tgbot.config import load_config, Config
 

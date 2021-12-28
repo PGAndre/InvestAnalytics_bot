@@ -19,8 +19,13 @@ def main_menu_keyboard_test():
 
 
 def first_menu_keyboard():
-    keyboard = [[InlineKeyboardButton('📅 Информация о подписке', callback_data=user_callback.new(action='sub_1'))],
-                [InlineKeyboardButton('💳 Оформить\Продлить подписку', callback_data=user_callback.new(action='sub_2'))],
+    keyboard = [[InlineKeyboardButton('📅 Информация о подписке', callback_data=user_callback.new(action='sub_info'))],
+                [InlineKeyboardButton('💳 Оформить\Продлить подписку', callback_data=user_callback.new(action='sub_approve'))],
+                [InlineKeyboardButton('Главное меню', callback_data=user_callback.new(action='main'))]]
+    return InlineKeyboardMarkup(inline_keyboard=keyboard)
+
+def sub_approve_keyboard():
+    keyboard = [[InlineKeyboardButton('🖌 С условиями согласен. Продолжить', callback_data=user_callback.new(action='sub_buy'))],
                 [InlineKeyboardButton('Главное меню', callback_data=user_callback.new(action='main'))]]
     return InlineKeyboardMarkup(inline_keyboard=keyboard)
 
