@@ -19,6 +19,7 @@ from tgbot.keyboards.user_menu import *
 from tgbot.misc import misc, tinkoff
 from tgbot.misc.misc import user_add_or_update
 from tgbot.misc.subscriptions import *
+from tgbot.models.admin import Document
 from tgbot.models.analytic import Prediction, Analytic
 from tgbot.models.orders import Product, PaymentInfo
 from tgbot.models.users import User
@@ -213,6 +214,15 @@ async def subscription_info(query: CallbackQuery):
     else:
         await query.message.answer(text=f'Ваша подписка истекает {subscription_until.date():%d-%m-%Y}')
 
+async def subscription_approve(query: CallbackQuery):
+    user: User = await user_add_or_update(query, role='user', module=__name__)
+    db_session = query.bot.get('db')
+    document_title='dogovoroferti'
+    document = await Document.get_document_by_title(db_session=db_session,title=document_title)
+    await query.message.answer_document(document=document.file_id)
+    await query.message.edit_text(
+        text=f'❗️Ознакомьтесь с условиями договора перед тем как перейти к оплате:❗️',
+        reply_markup=sub_approve_keyboard())
 
 async def subscription_edit(query: CallbackQuery):
     user: User = await user_add_or_update(query, role='user', module=__name__)
@@ -256,9 +266,12 @@ async def subscription_edit(query: CallbackQuery):
                                         need_email=True,
                                         send_email_to_provider=True
                                         )
-        await query.bot.send_invoice(query.from_user.id,
+        message = await query.bot.send_invoice(query.from_user.id,
                                      **ykassa_invoice.generate_invoice(),
                                      payload=payload+'__ykassa_telegram')
+        # message_id = message.message_id
+        # chat_id = message.chat.id
+        # await query.bot.delete_message()
 
     # payload = 'subscription__1__month'
     # title = 'Подписка на 1 месяц'
@@ -503,8 +516,9 @@ async def my_chat_member_update(my_chat_member: ChatMemberUpdated):
 def register_botuser(dp: Dispatcher):
     dp.register_pre_checkout_query_handler(process_pre_checkout_query, state="*")
     dp.register_callback_query_handler(first_menu, user_callback.filter(action='sub'), chat_type="private")
-    dp.register_callback_query_handler(subscription_info, user_callback.filter(action='sub_1'), chat_type="private")
-    dp.register_callback_query_handler(subscription_edit, user_callback.filter(action='sub_2'), chat_type="private")
+    dp.register_callback_query_handler(subscription_info, user_callback.filter(action='sub_info'), chat_type="private")
+    dp.register_callback_query_handler(subscription_edit, user_callback.filter(action='sub_buy'), chat_type="private")
+    dp.register_callback_query_handler(subscription_approve, user_callback.filter(action='sub_approve'), chat_type="private")
     dp.register_callback_query_handler(get_predict_list, user_callback.filter(action='pred'), state="*", chat_type="private")
     dp.register_callback_query_handler(predict_info, user_predict_callback.filter(), state="*", chat_type="private")
     dp.register_callback_query_handler(list_analytics, user_callback.filter(action='analytic'), state="*", chat_type="private")

@@ -3,7 +3,7 @@ from datetime import datetime, timedelta
 
 from aiogram import Dispatcher
 from aiogram.dispatcher import FSMContext
-from aiogram.types import Message, CallbackQuery, ReplyKeyboardRemove
+from aiogram.types import Message, CallbackQuery, ReplyKeyboardRemove, ContentType
 
 from tgbot.handlers.botuser import myinfo
 from tgbot.keyboards import reply
@@ -276,6 +276,19 @@ async def second_menu(query: CallbackQuery):
         reply_markup=second_menu_keyboard())
 
 
+async def uploaddoc(message: Message):
+    user: User = await user_add_or_update(message, role='admin', module=__name__)
+    if message.document:
+        document_id=message.document.file_id
+        document_name = message.document.file_name
+    else:
+        return
+    await message.answer_document(document=document_id)
+    await message.reply(text=f'<b>Имя документа</b>: {document_name}\n<b>ID документа</b>: {document_id}\nОтправьте этот текст разработчику')
+
+    # await message.answer(text=main_menu_message(),
+    #                      reply_markup=main_menu_keyboard())
+
 
 
 def register_admin(dp: Dispatcher):
@@ -296,4 +309,5 @@ def register_admin(dp: Dispatcher):
     dp.register_message_handler(set_nickname, state=Analytics.Set_Nickname)
     dp.register_message_handler(check_analytic, state=Analytics.Check_Analytic)
     dp.register_message_handler(publish, text="опубликовать", state=Analytics.Publish)
+    dp.register_message_handler(uploaddoc, state="*", is_admin=True, chat_type="private", content_types = ContentType.DOCUMENT)
 
