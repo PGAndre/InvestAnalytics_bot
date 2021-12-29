@@ -4,17 +4,17 @@ from tgbot.keyboards.callback_datas import analytic_callback
 
 
 def main_menu_keyboard():
-    keyboard = [[InlineKeyboardButton('Управление прогнозами', callback_data=analytic_callback.new(action='pred'))],
-                [InlineKeyboardButton('Получить ссылку на канал', callback_data=analytic_callback.new(action='link'))],
-                [InlineKeyboardButton('Информация о пользователе', callback_data=analytic_callback.new(action='myinfo'))]]
+    keyboard = [[InlineKeyboardButton('📈 Управление прогнозами', callback_data=analytic_callback.new(action='pred'))],
+                [InlineKeyboardButton('🚀 Получить ссылку на канал', callback_data=analytic_callback.new(action='link'))],
+                [InlineKeyboardButton('👨‍💻 Информация о пользователе', callback_data=analytic_callback.new(action='myinfo'))]]
     return InlineKeyboardMarkup(inline_keyboard=keyboard)
 
 
 def first_menu_keyboard():
-    keyboard = [[InlineKeyboardButton('создать прогноз', callback_data=analytic_callback.new(action='pred_1'))],
-                [InlineKeyboardButton('список активных прогнозов', callback_data=analytic_callback.new(action='pred_2'))],
-                [InlineKeyboardButton('список моих активных прогнозов', callback_data=analytic_callback.new(action='pred_3'))],
-                [InlineKeyboardButton('Main menu', callback_data=analytic_callback.new(action='main'))]]
+    keyboard = [[InlineKeyboardButton('📈 Создать прогноз', callback_data=analytic_callback.new(action='pred_1'))],
+                [InlineKeyboardButton('🗓 Список активных прогнозов', callback_data=analytic_callback.new(action='pred_2'))],
+                [InlineKeyboardButton('🗼 Список моих активных прогнозов', callback_data=analytic_callback.new(action='pred_3'))],
+                [InlineKeyboardButton('Главное меню', callback_data=analytic_callback.new(action='main'))]]
     return InlineKeyboardMarkup(inline_keyboard=keyboard)
 
 
