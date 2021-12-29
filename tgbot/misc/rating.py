@@ -46,10 +46,10 @@ async def predictions_active():
     # список всех предиктов is_active
     predictions: list[Prediction] = await Prediction.get_active_predicts(db_session=db_session)
     for prediction in predictions:
-        print(f' предикт: прогнозируемое значение: {prediction.predicted_value}. {prediction}, {prediction.__dict__}')
+        #print(f' предикт: прогнозируемое значение: {prediction.predicted_value}. {prediction}, {prediction.__dict__}')
         to_date = prediction.start_date
         isLong = math.copysign(1, (prediction.predicted_value - prediction.start_value))
-        print(to_date)
+        #print(to_date)
         predictionanalysis: PredictionAnalys = await prediction_candle_analys(prediction, config)
 
         if not predictionanalysis:
@@ -69,7 +69,7 @@ async def predictions_active():
                                                 end_date=end_date,
                                                 id=prediction.id)
                 # print(f'ЗАВЕРШЕННЫЙ ПРЕДИКТ ИЗМЕНЕН В БАЗЕ: {prediction.__dict__}')
-                print(f'прогноз сбылся: {type(end_date)}')
+                #print(f'прогноз сбылся: {type(end_date)}')
             else:  # если не сбылся - записываем лучшее значение
                 # записываем изначальную дату прогноза.
                 end_date = prediction.predicted_date
@@ -87,13 +87,13 @@ async def predictions_active():
                                                 end_date=end_date,
                                                 id=prediction.id)
                 # print(f'ЗАВЕРШЕННЫЙ ПРЕДИКТ ИЗМЕНЕН В БАЗЕ: {prediction.__dict__}')
-                print(f'максимальное значение за этот период: {end_value}')
-                print(f'прогноз не сбылся: {end_date.date()}')
+                #print(f'максимальное значение за этот период: {end_value}')
+                #print(f'прогноз не сбылся: {end_date.date()}')
 
         else:  # если скро предикта еще не истек
             if predictionanalysis.prediction_index <= 0:
                 end_date = predictionanalysis.first_candle_morethen_predicted.time.replace(tzinfo=None)
-                print(f'прогноз сбылся раньше времени{type(end_date)}')
+                #print(f'прогноз сбылся раньше времени{type(end_date)}')
                 end_value = prediction.predicted_value
                 successful = True
                 await Prediction.update_predict(db_session,
@@ -104,7 +104,7 @@ async def predictions_active():
                 # print(f'ЗАВЕРШЕННЫЙ ПРЕДИКТ ИЗМЕНЕН В БАЗЕ: {prediction.__dict__}')
 
             else:
-                print(f'pass')
+                #print(f'pass')
                 pass
 
 
@@ -125,7 +125,7 @@ async def predictions_active():
 
 async def predictions_active_finished():
     config: Config = load_config()
-    print(config.tg_bot.token)
+    #print(config.tg_bot.token)
     bot = Bot(token=config.tg_bot.token, parse_mode='HTML')
     channel_id = config.tg_bot.channel_id
     # await bot.kick_chat_member(chat_id=channel_id, user_id=2065163769, until_date=timedelta(seconds=31))
@@ -137,7 +137,7 @@ async def predictions_active_finished():
     # список всех предиктов is_active
     predictions: list[Prediction] = await Prediction.get_active_finished_predicts(db_session=db_session)
     for prediction in predictions:
-        print(f' предикт: прогнозируемое значение: {prediction.analytic.__dict__}, {prediction}, {prediction.__dict__}')
+       #print(f' предикт: прогнозируемое значение: {prediction.analytic.__dict__}, {prediction}, {prediction.__dict__}')
         analytic_id = prediction.analytic_id
         analytic = await Analytic.get_analytic_by_id(db_session=db_session, telegram_id=prediction.analytic_id)
         prediction_rating = await prediction.calculate_rating(analytic)
@@ -153,18 +153,18 @@ async def predictions_active_finished():
 
 
         new_rating = await analytic.calculate_rating(prediction_rating)
-        print(f' ПОСЧИТАННЫЙ РЕЙТИНГ АНАЛИТИКА {new_rating}')
+        #print(f' ПОСЧИТАННЫЙ РЕЙТИНГ АНАЛИТИКА {new_rating}')
 
         await Analytic.set_analytic_rating(db_session, rating=new_rating, telegram_id=analytic_id)
         await Prediction.update_predict_rating(db_session, id=prediction.id, rating=prediction_rating)
         updated_prediction = await Prediction.get_predict_by_id(db_session=db_session,
                                                                 id=prediction.id)
-        print(f'СТАРЫЙ РЕЙТИНГ {analytic.rating}')
-        print(f' Аалитик: старое: {analytic}, {analytic.__dict__}')
+        #print(f'СТАРЫЙ РЕЙТИНГ {analytic.rating}')
+        #print(f' Аалитик: старое: {analytic}, {analytic.__dict__}')
         updated_analytic = await Analytic.get_analytic_by_id(db_session, analytic_id)
-        print(f'НОВЫЙ РЕЙТИНГ АНАЛИТИКА {updated_analytic.rating}')
+        #print(f'НОВЫЙ РЕЙТИНГ АНАЛИТИКА {updated_analytic.rating}')
         rating_delta = updated_analytic.rating - analytic.rating
-        print(f' Аалитик: новое: {updated_analytic}, {updated_analytic.__dict__}')
+        #print(f' Аалитик: новое: {updated_analytic}, {updated_analytic.__dict__}')
         # new_text = updated_prediction.message_text
 
         message_id = updated_prediction.message_id
@@ -236,15 +236,15 @@ async def predictions_active_finished():
 
 # noinspection PyTypeChecker
 async def prediction_candle_analys(prediction: Prediction, config: Config):
-    print(prediction.start_date.date() + timedelta(days=2))
-    print(datetime.now().date())
+    #print(prediction.start_date.date() + timedelta(days=2))
+    #print(datetime.now().date())
     if prediction.start_date.date() + timedelta(days=2) <= datetime.now().date():
-        print('больше двух дней')
+        #print('больше двух дней')
 
-        print(prediction.start_date + timedelta(hours=2))
-        print(datetime.utcnow())
+        #print(prediction.start_date + timedelta(hours=2))
+        #print(datetime.utcnow())
         isLong = math.copysign(1, (prediction.predicted_value - prediction.start_value))
-        print(isLong)
+        #print(isLong)
         candles_lasthour = (
             await get_candles_inrange(figi=prediction.figi, from_=datetime.utcnow()+ timedelta(hours=-2),
                                       to=datetime.utcnow(),
@@ -280,48 +280,48 @@ async def prediction_candle_analys(prediction: Prediction, config: Config):
         if not all_candles:
             predictionanalysis = None
             return predictionanalysis
-        print(all_candles)
+        #print(all_candles)
         if isLong > 0:
             bestcandle = max(all_candles, key=lambda item: item.h)
             candles_morethen_predicted = [x for x in all_candles if x.h >= prediction.predicted_value]
-            print(f'maxof_candles.h: {bestcandle.h}')
+            #print(f'maxof_candles.h: {bestcandle.h}')
         else:
             bestcandle = min(all_candles, key=lambda item: item.l)
             candles_morethen_predicted = [x for x in all_candles if x.l <= prediction.predicted_value]
-            print(f'minof_candles_daily.h: {bestcandle.l}')
+            #print(f'minof_candles_daily.h: {bestcandle.l}')
 
         if not candles_morethen_predicted:
             predictionanalysis = PredictionAnalys(bestcandle, bestcandle, prediction_index=1)
             return predictionanalysis
 
         first_candle_morethen_predicted = min(candles_morethen_predicted, key=lambda item: item.time)
-        pprint.pprint(f'первая свеча в которых предикт сбылся за всё время : {first_candle_morethen_predicted}')
+        #pprint.pprint(f'первая свеча в которых предикт сбылся за всё время : {first_candle_morethen_predicted}')
 
         if isLong > 0:
             current_difference = prediction.predicted_value - bestcandle.h
         else:
             current_difference = prediction.predicted_value - bestcandle.l
 
-        print(current_difference)
+        #print(current_difference)
         predict_sign = decimal.Decimal(math.copysign(1, (prediction.predicted_value - prediction.start_value)))
-        print(predict_sign)
+        #print(predict_sign)
         prediction_index = current_difference * predict_sign
-        print(f'текущая индекс предсказания (сбылся в случае если отрицательное значение): {prediction_index}')
+        #print(f'текущая индекс предсказания (сбылся в случае если отрицательное значение): {prediction_index}')
         # выше мы нашли максимальное значение из свечей в двух диапазонах: в первый день почасовые свечи, после этого посуточные свечи. Взяли максимальную из них по значению Candle.h
-        print(prediction.predicted_date.date() + timedelta(days=1))
+        #print(prediction.predicted_date.date() + timedelta(days=1))
         predictionAnalys: PredictionAnalys = PredictionAnalys(bestcandle, first_candle_morethen_predicted,
                                                               prediction_index)
         return predictionAnalys
 
 
     elif prediction.start_date + timedelta(hours=2) <= datetime.utcnow():
-        print(f'от двух часов')
-        print(prediction.start_date + timedelta(hours=2))
-        print(datetime.utcnow())
+        #print(f'от двух часов')
+        #print(prediction.start_date + timedelta(hours=2))
+        #print(datetime.utcnow())
         # to_time = (prediction.start_date + timedelta(hours=1)).replace(minute=59, second=0)
         # print(to_time)
         isLong = math.copysign(1, (prediction.predicted_value - prediction.start_value))
-        print(isLong)
+        #print(isLong)
         candles_firsthour = (
             await get_candles_inrange(figi=prediction.figi, from_=prediction.start_date + timedelta(hours=-1),
                                       to=(prediction.start_date + timedelta(hours=1)).replace(minute=59, second=0),
@@ -344,7 +344,7 @@ async def prediction_candle_analys(prediction: Prediction, config: Config):
             await get_candles_inrange(figi=prediction.figi, from_=prediction.start_date, to=datetime.utcnow(),
                                       interval='hour',
                                       config=config)).candles
-        print(f'почасовые№№№№№№№№№№№№№№№№№№№№№№№№№№№№№№№№№№№№№№№№№№№№№№№№№')
+        #print(f'почасовые№№№№№№№№№№№№№№№№№№№№№№№№№№№№№№№№№№№№№№№№№№№№№№№№№')
 
         candles_hourly = [x for x in candles_hourly if x.time.replace(tzinfo=None) <= prediction.predicted_date]
 
@@ -352,45 +352,45 @@ async def prediction_candle_analys(prediction: Prediction, config: Config):
         if not all_candles:
             predictionanalysis = None
             return predictionanalysis
-        print(all_candles)
+        #print(all_candles)
         if isLong > 0:
             bestcandle = max(all_candles, key=lambda item: item.h)
             candles_morethen_predicted = [x for x in all_candles if x.h >= prediction.predicted_value]
-            print(f'maxof_candles.h: {bestcandle.h}')
+            #print(f'maxof_candles.h: {bestcandle.h}')
         else:
             bestcandle = min(all_candles, key=lambda item: item.l)
             candles_morethen_predicted = [x for x in all_candles if x.l <= prediction.predicted_value]
-            print(f'minof_candles_daily.h: {bestcandle.l}')
+            #print(f'minof_candles_daily.h: {bestcandle.l}')
 
         if not candles_morethen_predicted:
             predictionanalysis = PredictionAnalys(bestcandle, bestcandle, prediction_index=1)
             return predictionanalysis
 
         first_candle_morethen_predicted = min(candles_morethen_predicted, key=lambda item: item.time)
-        pprint.pprint(f'первая свеча в которых предикт сбылся за всё время : {first_candle_morethen_predicted}')
+        #pprint.pprint(f'первая свеча в которых предикт сбылся за всё время : {first_candle_morethen_predicted}')
 
         if isLong > 0:
             current_difference = prediction.predicted_value - bestcandle.h
         else:
             current_difference = prediction.predicted_value - bestcandle.l
 
-        print(current_difference)
+        #print(current_difference)
         predict_sign = decimal.Decimal(math.copysign(1, (prediction.predicted_value - prediction.start_value)))
-        print(predict_sign)
+        #print(predict_sign)
         prediction_index = current_difference * predict_sign
-        print(f'текущая индекс предсказания (сбылся в случае если отрицательное значение): {prediction_index}')
+        #print(f'текущая индекс предсказания (сбылся в случае если отрицательное значение): {prediction_index}')
         # выше мы нашли максимальное значение из свечей в двух диапазонах: в первый день почасовые свечи, после этого посуточные свечи. Взяли максимальную из них по значению Candle.h
-        print(prediction.predicted_date.date() + timedelta(days=1))
+        #print(prediction.predicted_date.date() + timedelta(days=1))
         predictionAnalys: PredictionAnalys = PredictionAnalys(bestcandle, first_candle_morethen_predicted,
                                                               prediction_index)
         return predictionAnalys
 
     else:
-        print('меньше двух часов')
+        #print('меньше двух часов')
         to_time = (prediction.start_date + timedelta(hours=1)).replace(minute=59, second=0)
-        print(to_time)
+        #print(to_time)
         isLong = math.copysign(1, (prediction.predicted_value - prediction.start_value))
-        print(isLong)
+        #print(isLong)
         candles_firsthour = (
             await get_candles_inrange(figi=prediction.figi, from_=prediction.start_date + timedelta(hours=-2),
                                       to=datetime.utcnow(), interval='minute',
@@ -399,7 +399,7 @@ async def prediction_candle_analys(prediction: Prediction, config: Config):
             predictionanalysis = None
             return predictionanalysis
 
-        print(f'dfgkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkk')
+        #print(f'dfgkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkk')
 
         candles_firsthour = [x for x in candles_firsthour if x.time.replace(tzinfo=None) >= prediction.start_date]
         candles_firsthour = [x for x in candles_firsthour if x.time.replace(tzinfo=None) <= prediction.predicted_date]
@@ -416,8 +416,8 @@ async def prediction_candle_analys(prediction: Prediction, config: Config):
                 bestcandle_firsthour = min(candles_firsthour, key=lambda item: item.l)
                 candles_morethen_predicted_firsthour = [x for x in candles_firsthour if
                                                         x.l <= prediction.predicted_value]
-                print(bestcandle_firsthour.__dict__)
-        pprint.pprint(f'свечи в которых предикт сбылся за первый час: {candles_morethen_predicted_firsthour}')
+                #print(bestcandle_firsthour.__dict__)
+        #pprint.pprint(f'свечи в которых предикт сбылся за первый час: {candles_morethen_predicted_firsthour}')
 
         if not candles_morethen_predicted_firsthour:
             predictionanalysis = PredictionAnalys(bestcandle_firsthour, bestcandle_firsthour, prediction_index=1)
@@ -431,13 +431,13 @@ async def prediction_candle_analys(prediction: Prediction, config: Config):
             current_difference = prediction.predicted_value - bestcandle_firsthour.h
         else:
             current_difference = prediction.predicted_value - bestcandle_firsthour.l
-        print(current_difference)
+        #print(current_difference)
         predict_sign = decimal.Decimal(math.copysign(1, (prediction.predicted_value - prediction.start_value)))
-        print(predict_sign)
+        #print(predict_sign)
         prediction_index = current_difference * predict_sign
-        print(f'текущая индекс предсказания (сбылся в случае если отрицательное значение): {prediction_index}')
+        #print(f'текущая индекс предсказания (сбылся в случае если отрицательное значение): {prediction_index}')
         # выше мы нашли максимальное значение из свечей в двух диапазонах: в первый день почасовые свечи, после этого посуточные свечи. Взяли максимальную из них по значению Candle.h
-        print(prediction.predicted_date.date() + timedelta(days=1))
+        #print(prediction.predicted_date.date() + timedelta(days=1))
         predictionAnalys: PredictionAnalys = PredictionAnalys(bestcandle_firsthour, first_candle_morethen_predicted,
                                                               prediction_index)
         return predictionAnalys
