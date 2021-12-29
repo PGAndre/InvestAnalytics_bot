@@ -269,9 +269,9 @@ async def subscription_edit(query: CallbackQuery):
         message = await query.bot.send_invoice(query.from_user.id,
                                      **ykassa_invoice.generate_invoice(),
                                      payload=payload+'__ykassa_telegram')
-        message_id = message.message_id
-        chat_id = message.chat.id
-        await query.bot.delete_message()
+        # message_id = message.message_id
+        # chat_id = message.chat.id
+        # await query.bot.delete_message()
 
     # payload = 'subscription__1__month'
     # title = 'Подписка на 1 месяц'
