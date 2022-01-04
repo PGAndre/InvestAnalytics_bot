@@ -3,7 +3,6 @@ import math
 import pprint
 from datetime import datetime, timedelta
 
-import length as length
 from dateutil.relativedelta import relativedelta
 
 from aiogram import Dispatcher
