@@ -3,6 +3,7 @@ import math
 import pprint
 from datetime import datetime, timedelta
 
+import length as length
 from dateutil.relativedelta import relativedelta
 
 from aiogram import Dispatcher
@@ -94,6 +95,10 @@ async def myinfo(query: CallbackQuery):
 
 async def list_analytics(query: CallbackQuery):
     user: User = await user_add_or_update(query, role='user', module=__name__)
+    if user.subscription_until < datetime.utcnow():
+        await query.message.edit_text(
+            f"Здравствуйте! \nВаша подписка истекла. Обновите подписку для получения ссылки на канал.", reply_markup=first_menu_keyboard())
+        return
     await query.answer()
     config = query.bot.get('config')
     db_session = query.bot.get('db')
@@ -111,6 +116,11 @@ async def list_analytics(query: CallbackQuery):
     await query.message.edit_text(text='Список аналитиков:', reply_markup=markup)
 
 async def choose_analytic(query: CallbackQuery, callback_data: dict):
+    user: User = await user_add_or_update(query, role='user', module=__name__)
+    if user.subscription_until < datetime.utcnow():
+        await query.message.edit_text(
+            f"Здравствуйте! \nВаша подписка истекла. Обновите подписку для получения ссылки на канал.", reply_markup=first_menu_keyboard())
+        return
     db_session = query.bot.get('db')
     logger=logging.getLogger(__name__)
     await query.answer()
@@ -269,6 +279,53 @@ async def subscription_edit(query: CallbackQuery):
         message = await query.bot.send_invoice(query.from_user.id,
                                      **ykassa_invoice.generate_invoice(),
                                      payload=payload+'__ykassa_telegram')
+
+
+##### ТЕСТОВЫЙ ПЛАТЁЖ
+    if user.role == 'tester':
+        testpayment_products: Product = await Product.get_product_like_payload(db_session=db_session, payload='testpayment')
+        for testpayment_product in testpayment_products:
+            payload = testpayment_product.payload
+            title = testpayment_product.title
+            description = testpayment_product.description
+            currency = testpayment_product.currency
+            price = float(testpayment_product.price)
+            ammount_labaledPrice = int(price * 100.00)
+
+            provider_data = {
+                "receipt": {
+                    "items": [
+                        {
+                            "description": description,
+                            "quantity": "1.00",
+                            "amount": {
+                                "value": price,
+                                "currency": currency
+                            },
+                            "vat_code": "2",
+                        }
+                    ]
+                }
+            }
+
+            ykassa_invoice_test = Ykassa_payment(title=title,
+                                            description=description,
+                                            currency=currency,
+                                            prices=[
+                                                LabeledPrice(
+                                                    label="testpayment",
+                                                    amount=ammount_labaledPrice
+                                                )
+                                            ],
+                                            provider_data=provider_data,
+                                            start_parameter="create_invoice_sosisochnyi_test",
+                                            need_email=True,
+                                            send_email_to_provider=True
+                                            )
+            message = await query.bot.send_invoice(query.from_user.id,
+                                         **ykassa_invoice_test.generate_invoice(),
+                                         payload=payload+'__ykassa_telegram')
+
         # message_id = message.message_id
         # chat_id = message.chat.id
         # await query.bot.delete_message()
@@ -327,8 +384,34 @@ async def subscription_edit(query: CallbackQuery):
 
 async def process_pre_checkout_query(query: PreCheckoutQuery):
     # await query.bot.send_message(chat_id=query.from_user.id, text="Спасибо за подписку!")
-    await query.bot.answer_pre_checkout_query(pre_checkout_query_id=query.id, ok=True)
+    payload_check = '__'.join(query.invoice_payload.split(sep="__")[:-1]) #получаем payload но без последней части после '__'/ тоесть ровно так, как должно быть в БД
+    db_session = query.bot.get('db')
+    check_products: Product = await Product.get_product_like_payload(db_session=db_session, payload=f'{payload_check}')
+
+    test_product = []
+    for check_product in check_products:
+        test_product.append(check_product)
+    if not test_product:
+        await query.bot.answer_pre_checkout_query(pre_checkout_query_id=query.id, ok=False,
+                                                  error_message='Такого продукта уже нет в прайсе. Загрузите Прайс еще раз')
+        await query.bot.send_message(chat_id=query.from_user.id,
+                                     text="Такого продукта уже нет в прайсе. Загрузите Прайс еще раз")
+        return
+    if len(test_product) == 1:
+        test_product = test_product[0]
+    if float(query.total_amount/100) == float(test_product.price):
+        await query.bot.answer_pre_checkout_query(pre_checkout_query_id=query.id, ok=True)
+    else:
+
+        await query.bot.answer_pre_checkout_query(pre_checkout_query_id=query.id, ok=False,
+                                                  error_message='Продукт не актуален. Загрузите Прайс еще раз')
+        await query.bot.send_message(chat_id=query.from_user.id,
+                                     text="Продукт не актуален. Загрузите Прайс еще раз")
+
+
+    # await query.bot.answer_pre_checkout_query(pre_checkout_query_id=query.id, ok=True)
     #print(answer)
+
 
 async def process_success_payment(query: SuccessfulPayment):
     user: User = await user_add_or_update(query, role='user', module=__name__)
@@ -338,42 +421,51 @@ async def process_success_payment(query: SuccessfulPayment):
     currency = successful_payment.currency
     invoice_payload = successful_payment.invoice_payload
     payload_splited = invoice_payload.split(sep="__")
-    ammount_sub = int(payload_splited[1])
-    provider = payload_splited[3]
-    provider_payment_charge_id = successful_payment.provider_payment_charge_id
-    telegram_payment_charge_id = successful_payment.telegram_payment_charge_id
-    total_amount = successful_payment.total_amount
-    try:
-        email = successful_payment.order_info.email
-    except:
-        email=None
-    current_subscription = user.subscription_until
-    if user.subscription_until > datetime.utcnow():
-        new_subscription = user.subscription_until + relativedelta(months=ammount_sub)
-    else:
-        new_subscription = datetime.utcnow() + relativedelta(months=ammount_sub)
-    updated_user: User = await user.update_user(db_session=db_session,
-                                                subscription_until=new_subscription)
-    keyboard_link = [[InlineKeyboardButton('🚀 Получить ссылку на канал', callback_data=user_callback.new(action='link'))],
-                     [InlineKeyboardButton('Главное меню', callback_data=user_callback.new(action='main'))]]
-    link_markup = InlineKeyboardMarkup(inline_keyboard=keyboard_link)
-    await query.bot.send_message(chat_id=query.from_user.id, text="Спасибо за подписку! Нажмите на кнопку для получения ссылки на канал", reply_markup=link_markup)
-    logger = logging.getLogger(__name__)
-    logger.info(
-        f'пользователь {user.telegram_id}, {user.username}, {user.first_name}, {email} произвёл оплату на {float(total_amount)/100} {currency} за {invoice_payload}')
-    updated_user: User = await User.get_user(db_session=db_session, telegram_id=user_id)
+    if payload_splited[0] == 'subscription':
+        ammount_sub = int(payload_splited[1])
+        provider = payload_splited[3]
+        provider_payment_charge_id = successful_payment.provider_payment_charge_id
+        telegram_payment_charge_id = successful_payment.telegram_payment_charge_id
+        total_amount = successful_payment.total_amount
+        try:
+            email = successful_payment.order_info.email
+        except:
+            email=None
+        current_subscription = user.subscription_until
+        if user.subscription_until > datetime.utcnow():
+            new_subscription = user.subscription_until + relativedelta(months=ammount_sub)
+        else:
+            new_subscription = datetime.utcnow() + relativedelta(months=ammount_sub)
+        updated_user: User = await user.update_user(db_session=db_session,
+                                                    subscription_until=new_subscription)
+        keyboard_link = [[InlineKeyboardButton('🚀 Получить ссылку на канал', callback_data=user_callback.new(action='link'))],
+                         [InlineKeyboardButton('Главное меню', callback_data=user_callback.new(action='main'))]]
+        link_markup = InlineKeyboardMarkup(inline_keyboard=keyboard_link)
+        await query.bot.send_message(chat_id=query.from_user.id, text="Спасибо за подписку! Нажмите на кнопку для получения ссылки на канал", reply_markup=link_markup)
+        logger = logging.getLogger(__name__)
+        logger.info(
+            f'пользователь {user.telegram_id}, {user.username}, {user.first_name}, {email} произвёл оплату на {float(total_amount)/100} {currency} за {invoice_payload}')
+        updated_user: User = await User.get_user(db_session=db_session, telegram_id=user_id)
 
-    paymentinfo: PaymentInfo = await PaymentInfo.add_paymentinfo(db_session=db_session,
-                                      user_id=user_id,
-                                      email=email,
-                                      provider=provider,
-                                      provider_payment_charge_id=provider_payment_charge_id,
-                                      telegram_payment_charge_id=telegram_payment_charge_id,
-                                      invoice_payload=invoice_payload,
-                                      total_amount=float(total_amount/100),
-                                      currency=currency)
-    getpaymentinfo: PaymentInfo = await PaymentInfo.get_paymentinfo_by_charge_id_provider(db_session=db_session,
-                                                                                                  provider_payment_charge_id=provider_payment_charge_id, provider=provider)
+        paymentinfo: PaymentInfo = await PaymentInfo.add_paymentinfo(db_session=db_session,
+                                          user_id=user_id,
+                                          email=email,
+                                          provider=provider,
+                                          provider_payment_charge_id=provider_payment_charge_id,
+                                          telegram_payment_charge_id=telegram_payment_charge_id,
+                                          invoice_payload=invoice_payload,
+                                          total_amount=float(total_amount/100),
+                                          currency=currency)
+        getpaymentinfo: PaymentInfo = await PaymentInfo.get_paymentinfo_by_charge_id_provider(db_session=db_session,
+                                                                                              provider_payment_charge_id=provider_payment_charge_id, provider=provider)
+
+    elif payload_splited[0] == 'testpayment':
+        await query.bot.send_message(chat_id=query.from_user.id,
+                                     text="Вы произвели тестовую оплату. платёж прошел успешно")
+        logger = logging.getLogger(__name__)
+        logger.info(
+            f'тестовый пользователь {user.telegram_id}, {user.username}, {user.first_name} произвёл ТЕСТОВУЮ ОПЛАТУ')
+
 
 async def successful_payment(message: Message):
     print(message)
