@@ -133,4 +133,4 @@ async def notify_users_with_inactive_sub():
 # asyncio.run(kick_users_notmember())
 # asyncio.run(notify_users_with_active_sub())
 # asyncio.run(notify_users_with_inactive_sub())
-asyncio.run(kick_users())
+# asyncio.run(kick_users())
