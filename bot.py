@@ -95,7 +95,7 @@ async def main():
     ])
     scheduler.add_job(calculate_rating_job, trigger)
     # scheduler.add_job(calculate_rating_job, "cron", hour='7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23')
-    scheduler.add_job(kick_users, "cron", hour='21')
+    scheduler.add_job(kick_users, "cron", hour='22')
     scheduler.add_job(notify_users_with_active_sub, "cron", hour='17')
     scheduler.add_job(notify_users_with_inactive_sub, "cron", hour='17')
     trigger_kick_notmembers = OrTrigger([
