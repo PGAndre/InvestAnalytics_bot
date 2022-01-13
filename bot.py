@@ -99,7 +99,7 @@ async def main():
     scheduler.add_job(notify_users_with_active_sub, "cron", hour='17')
     scheduler.add_job(notify_users_with_inactive_sub, "cron", hour='17')
     trigger_kick_notmembers = OrTrigger([
-        CronTrigger(hour='0-23', minute='1'),
+        CronTrigger(hour='23', minute='1'),
     ])
     scheduler.add_job(kick_users_notmember, trigger_kick_notmembers)
     logging.getLogger('apscheduler.executors.default').setLevel(logging.INFO)
