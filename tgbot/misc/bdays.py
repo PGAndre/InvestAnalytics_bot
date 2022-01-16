@@ -42,7 +42,7 @@ async def count_tdays(start_day, last_day):
     count = 0
     while temp_day < last_day:
         next_day = temp_day + ONE_DAY
-        if next_day.weekday() in [5, 6] or np.datetime64(next_day.date()) in holidays:
+        if temp_day.weekday() in [5, 6] or np.datetime64(next_day.date()) in holidays:
             temp_day = next_day
             continue
         count += 1
