@@ -266,24 +266,29 @@ class Prediction(Base):
             pass
 
 
-        print(f'predicted_days: {predict_days}')
-        print(f'end_value: {end_value} !!!!  predicted_value: {predicted_value} !!!! start:value: {start_value} !!!!!'
-              f' start date: {start_date} !!!!! predicted_date: {predicted_date} !!!!! end_date: {end_date}')
+        # print(f'predicted_days: {predict_days}')
+        # print(f'end_value: {end_value} !!!!  predicted_value: {predicted_value} !!!! start:value: {start_value} !!!!!'
+        #       f' start date: {start_date} !!!!! predicted_date: {predicted_date} !!!!! end_date: {end_date}')
 
         isLong = math.copysign(1, (predicted_value - start_value))
         profit = (end_value - start_value)*Decimal(isLong)/start_value
         predicted_profit = (predicted_value - start_value)*Decimal(isLong)/start_value
-        print(f'PREDICTED PROFIT: {predicted_profit}')
+        # print(f'PREDICTED PROFIT: {predicted_profit}')
         sign_profit = math.copysign(1, profit)
-        print(f'SIGN_PROFIT: {sign_profit}')
-        print(f'PROFIT: {profit}')
+        # print(f'SIGN_PROFIT: {sign_profit}')
+        # print(f'PROFIT: {profit}')
         # print(current_difference)
         # predict_sign = decimal.Decimal(math.copysign(1, (prediction.predicted_value - prediction.start_value)))
         # print(predict_sign)
         # prediction_index = current_difference * predict_sign
         bonus=random.randrange(bonus*100-20,bonus*100+20,1)/100
+        predict_days=min(predict_days,21)
         delta=sign_profit*math.pow((min((22 - predict_days), 22)/22), 1/3)*math.pow(float(predicted_profit)/0.30, 1/3)*math.pow(min(abs(profit), predicted_profit)/predicted_profit, 1/3)
         rating = (1 + delta)/2
+        #бонус ИНТРАДЕЙ
+        intraday_bonus = 0.8
+        if predict_days <2:
+            rating = 1 - ((1-rating)*intraday_bonus)
 #        rating = (31 - predict_days)/30
         rating_rounded = round(rating*100, 2)
         overbonus=random.randrange(180,220,1)/100
@@ -296,10 +301,10 @@ class Prediction(Base):
             if rating_rounded > 50:
                 rating_rounded = 50-overbonus
         rating_rounded = round(rating_rounded,2)
-        print(math.pow(min((22 - predict_days), 22)/22, 1/3))
-        print(math.pow(float(predicted_profit)/0.30, 1/3))
-        print(math.pow(min(abs(profit), predicted_profit)/predicted_profit, 1/3))
-        print(f'RATING: {rating_rounded}')
+        # print(math.pow(min((22 - predict_days), 22)/22, 1/3))
+        # print(math.pow(float(predicted_profit)/0.30, 1/3))
+        # print(math.pow(min(abs(profit), predicted_profit)/predicted_profit, 1/3))
+        # print(f'RATING: {rating_rounded}')
         return rating_rounded
 
     async def edit_message_text(self,
