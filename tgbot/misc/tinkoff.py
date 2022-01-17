@@ -110,6 +110,15 @@ async def get_latest_cost_history(figi: str, config: Config, to_time: datetime):
     # print(max(candles.candles, key=lambda item: item.h))  # среди всех объектов свечей выдаёт ту, у которой значение h(high price) максимально
     return candles.candles[-1].c
 
+async def latestcost(figi: str, config: Config):
+    tcs_token = config.misc.tcs_token
+    client = tinvest.AsyncClient(tcs_token)
+    OrderbookResponse = await client.get_market_orderbook(figi=figi, depth=1)
+    latestcost = OrderbookResponse.payload.last_price
+    await client.close()
+    return latestcost
+    # print(OrderbookResponse)
+
 
 async def get_candles_inrange(figi: str, from_: datetime, to: datetime, interval: str, config: Config)  -> Candles:
     if interval == 'hour':

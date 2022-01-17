@@ -124,8 +124,9 @@ async def predict_info(query: CallbackQuery, callback_data: dict):
     target = predict.predicted_value
     analytic_predicts_total=predict.analytic.predicts_total
     instrument = await tinkoff.search_by_ticker(ticker, config)
-    latestcost = await tinkoff.get_latest_cost_history(figi=instrument['figi'], config=config,
-                                                       to_time=datetime.utcnow()+timedelta(minutes=5))
+    latestcost = await tinkoff.latestcost(figi=instrument['figi'], config=config)
+    # latestcost = await tinkoff.get_latest_cost_history(figi=instrument['figi'], config=config,
+    #                                                    to_time=datetime.utcnow()+timedelta(minutes=5))
     profit = target - start_value
     sign_profit = math.copysign(1, profit)
     if sign_profit == -1:
@@ -208,8 +209,9 @@ async def check_ticker(message: Message, state: FSMContext):
             state = await state.reset_state()
             await make_predict(message)
         else:
-            latestcost = await tinkoff.get_latest_cost_history(figi=instrument['figi'], config=config,
-                                                               to_time=datetime.utcnow()+timedelta(minutes=5))
+            latestcost = await tinkoff.latestcost(figi=instrument['figi'], config=config)
+            # latestcost = await tinkoff.get_latest_cost_history(figi=instrument['figi'], config=config,
+            #                                                    to_time=datetime.utcnow()+timedelta(minutes=5))
             latestcost=float(latestcost)
             text = f'''Курс акции равен <b>{latestcost}</b>.
 ⚠️ВНИМАНИЕ: начальный курс акции будет скоректирован на актуальное значение на шаге подтверждения прогноза.⚠️
@@ -287,8 +289,9 @@ async def set_target(message: Message, state: FSMContext):
         start_value = data['start_value']
         ticker = data['ticker']
     instrument = await tinkoff.search_by_ticker(ticker, config)
-    latestcost = await tinkoff.get_latest_cost_history(figi=instrument['figi'], config=config,
-                                                       to_time=datetime.utcnow()+timedelta(minutes=5))
+    latestcost = await tinkoff.latestcost(figi=instrument['figi'], config=config)
+    # latestcost = await tinkoff.get_latest_cost_history(figi=instrument['figi'], config=config,
+    #                                                    to_time=datetime.utcnow()+timedelta(minutes=5))
     start_value=float(latestcost)
     profit = (target - start_value) * 100 / start_value
     if abs(profit) > 30:
@@ -322,8 +325,9 @@ async def confirm(message: Message, state: FSMContext):
     async with state.proxy() as data:
         ticker = data['ticker']
     instrument = await tinkoff.search_by_ticker(ticker, config)
-    latestcost = await tinkoff.get_latest_cost_history(figi=instrument['figi'], config=config,
-                                                       to_time=datetime.utcnow()+timedelta(minutes=5))
+    latestcost = await tinkoff.latestcost(figi=instrument['figi'], config=config)
+    # latestcost = await tinkoff.get_latest_cost_history(figi=instrument['figi'], config=config,
+    #                                                    to_time=datetime.utcnow()+timedelta(minutes=5))
     start_value=float(latestcost)
 
     db_session = message.bot.get('db')
@@ -388,8 +392,9 @@ async def publish(message: Message, state: FSMContext):
         analytic_predicts_total = data['predicts_total']
         predicted_date = await bdays.next_business_day(datetime.utcnow(), predict_time)
         instrument = await tinkoff.search_by_ticker(ticker, config)
-        latestcost = await tinkoff.get_latest_cost_history(figi=instrument['figi'], config=config,
-                                                           to_time=datetime.utcnow()+timedelta(minutes=5))
+        latestcost = await tinkoff.latestcost(figi=instrument['figi'], config=config)
+        # latestcost = await tinkoff.get_latest_cost_history(figi=instrument['figi'], config=config,
+        #                                                    to_time=datetime.utcnow()+timedelta(minutes=5))
         start_value=float(latestcost)
 
     profit=target-start_value
@@ -527,8 +532,9 @@ async def delete_my_predict(query: CallbackQuery, callback_data: dict):
     target = predict.predicted_value
     analytic_predicts_total = predict.analytic.predicts_total
     instrument = await tinkoff.search_by_ticker(ticker, config)
-    latestcost = await tinkoff.get_latest_cost_history(figi=instrument['figi'], config=config,
-                                                       to_time=datetime.utcnow())
+    latestcost = await tinkoff.latestcost(figi=instrument['figi'], config=config)
+    # latestcost = await tinkoff.get_latest_cost_history(figi=instrument['figi'], config=config,
+    #                                                    to_time=datetime.utcnow())
     analytic = await Analytic.get_analytic_by_id(db_session=db_session, telegram_id=analytic_id)
     end_value=latestcost
     end_date=datetime.utcnow()
