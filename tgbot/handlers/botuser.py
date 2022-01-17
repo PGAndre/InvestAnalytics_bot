@@ -169,8 +169,9 @@ async def predict_info(query: CallbackQuery, callback_data: dict):
     target = predict.predicted_value
     analytic_predicts_total=predict.analytic.predicts_total
     instrument = await tinkoff.search_by_ticker(ticker, config)
-    latestcost = await tinkoff.get_latest_cost_history(figi=instrument['figi'], config=config,
-                                                       to_time=datetime.utcnow())
+    latestcost = await tinkoff.latestcost(figi=instrument['figi'], config=config)
+    # latestcost = await tinkoff.get_latest_cost_history(figi=instrument['figi'], config=config,
+    #                                                    to_time=datetime.utcnow())
     comment = predict.comment
     profit=target-start_value
     sign_profit = math.copysign(1, profit)
