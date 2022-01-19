@@ -183,16 +183,21 @@ async def back_to(message: Message, state: FSMContext):
         async with state.proxy() as data:
             message.text = data['ticker']
         await check_ticker(message, state)
-    if current_state == 'Predict:Confirm':
+    if current_state == 'Predict:Set_Risk':
         await message.answer('Возврат к вводу цели', reply_markup=ReplyKeyboardRemove())
         async with state.proxy() as data:
             message.text = data['predict_time']
         await set_date(message, state)
-    if current_state == 'Predict:Publish':
-        await message.answer('Возврат к вводу коментария', reply_markup=ReplyKeyboardRemove())
+    if current_state == 'Predict:Confirm':
+        await message.answer('Возврат к вводу уровня риска', reply_markup=ReplyKeyboardRemove())
         async with state.proxy() as data:
             message.text = data['target']
         await set_target(message, state)
+    if current_state == 'Predict:Publish':
+        await message.answer('Возврат к вводу коментария', reply_markup=ReplyKeyboardRemove())
+        async with state.proxy() as data:
+            message.text = data['risk_level']
+        await set_risk(message, state)
 
 
 async def check_ticker(message: Message, state: FSMContext):
@@ -314,7 +319,32 @@ async def set_target(message: Message, state: FSMContext):
     # await message.answer(message)
     async with state.proxy() as data:
         data['target'] = target
+    await message.answer(f'Введите уровень риска к прогнозу ${ticker}(по желанию)\n<b>1</b> - низкий уровень риска \n<b>2</b> - средний уровень риска \n<b>3</b> - высокий уровень риска \n', reply_markup=reply.cancel_back_markup)
+    # await message.answer(f'Введите коментарий к прогнозу ${ticker}(по желанию)\n введите <b>0</b> (ноль) если не хотите оставлять коментарий', reply_markup=reply.cancel_back_markup)
+    await Predict.Set_Risk.set()
+    # await Predict.Confirm.set()
 
+async def set_risk(message: Message, state: FSMContext):
+    config = message.bot.get('config')
+    try:
+        risk_level = int(message.text)
+    except ValueError:
+        await message.answer('вы ввели неверную цель')
+        async with state.proxy() as data:
+            message.text = data['target']
+        await Predict.Set_Date.set()
+        await set_target(message, state)
+        return
+    if risk_level not in [1,2,3]:
+        await message.answer('вы ввели неверную цель\n возможные значения - 1,2,3')
+        async with state.proxy() as data:
+            message.text = data['target']
+        await Predict.Set_Date.set()
+        await set_target(message, state)
+        return
+    async with state.proxy() as data:
+        data['risk_level'] = risk_level
+        ticker = data['ticker']
     await message.answer(f'Введите коментарий к прогнозу ${ticker}(по желанию)\n введите <b>0</b> (ноль) если не хотите оставлять коментарий', reply_markup=reply.cancel_back_markup)
     await Predict.Confirm.set()
 
@@ -337,6 +367,7 @@ async def confirm(message: Message, state: FSMContext):
         data['analytic_nickname'] = analytic.Nickname
         data['analytic_rating'] = float(analytic.rating)
         data['predicts_total'] = analytic.predicts_total
+    risk_level = data['risk_level']
     ticker = data['ticker']
     predict_time = data['predict_time']
     predicted_date = await bdays.next_business_day(datetime.utcnow(), predict_time)
@@ -350,12 +381,16 @@ async def confirm(message: Message, state: FSMContext):
     else:
         circle='🟢'
 
+    risk = '⚡'*risk_level
+
+
     if comment == str(0):
         text = f'''
 🏦<b>${ticker}</b> ({name})
 ⏱Дата окончания:  <b>{predicted_date.date():%d-%m-%Y}</b>
 {circle}Цена: <b>{start_value} {currency}</b>➡<b>{target} {currency}</b>
 ⚠️ВНИМАНИЕ: начальный курс акции будет скоректирован на актуальное значение после нажатия на кнопку "опубликовать"⚠
+Уровень риска: {risk}
 Аналитик: <b>{analytic.Nickname}</b>
 Рейтинг: <b>{analytic.rating}</b>
 Всего прогнозов: <b>{analytic.predicts_total}</b>'''
@@ -365,6 +400,7 @@ async def confirm(message: Message, state: FSMContext):
 ⏱Дата окончания:  <b>{predicted_date.date():%d-%m-%Y}</b>
 {circle}Цена: <b>{start_value} {currency}</b>➡<b>{target} {currency}</b>
 ⚠️ВНИМАНИЕ: начальный курс акции будет скоректирован на актуальное значение после нажатия на кнопку "опубликовать"⚠
+Уровень риска: {risk}
 Аналитик: <b>{analytic.Nickname}</b>
 Рейтинг: <b>{analytic.rating}</b>
 Всего прогнозов: <b>{analytic.predicts_total}</b>
@@ -390,6 +426,7 @@ async def publish(message: Message, state: FSMContext):
         analytic_nickname = data['analytic_nickname']
         analytic_rating = data['analytic_rating']
         analytic_predicts_total = data['predicts_total']
+        risk_level = data['risk_level']
         predicted_date = await bdays.next_business_day(datetime.utcnow(), predict_time)
         instrument = await tinkoff.search_by_ticker(ticker, config)
         latestcost = await tinkoff.latestcost(figi=instrument['figi'], config=config)
@@ -403,12 +440,14 @@ async def publish(message: Message, state: FSMContext):
         circle='🔴'
     else:
         circle='🟢'
+    risk='⚡'*risk_level
 
     db_session = message.bot.get('db')
     if comment == str(0):
         text = f'''🏦 <b>${ticker}</b> ({name})
 ⏱Дата окончания:  <b>{predicted_date.date():%d-%m-%Y}</b>
 {circle}Цена: <b>{start_value} {currency}</b>➡<b>{target} {currency}</b>
+Уровень риска: {risk}
 Аналитик: <b>{analytic_nickname}</b>
 Рейтинг: <b>{analytic_rating}</b>
 Всего прогнозов: <b>{analytic_predicts_total}</b>'''
@@ -416,6 +455,7 @@ async def publish(message: Message, state: FSMContext):
         text = f'''🏦 <b>${ticker}</b> ({name})
 ⏱Дата окончания:  <b>{predicted_date.date():%d-%m-%Y}</b>
 {circle}Цена: <b>{start_value} {currency}</b>➡<b>{target} {currency}</b>
+Уровень риска: {risk}
 Аналитик: <b>{analytic_nickname}</b>
 Рейтинг: <b>{analytic_rating}</b>
 Всего прогнозов: <b>{analytic_predicts_total}</b>
@@ -451,7 +491,8 @@ async def publish(message: Message, state: FSMContext):
                                                           message_id=channel_message.message_id,
                                                           message_url=channel_message.url,
                                                           message_text=channel_message.html_text,
-                                                          comment=comment
+                                                          comment=comment,
+                                                          risk_level=risk_level
                                                           )
     await state.finish()
 
@@ -786,13 +827,14 @@ def register_analytic(dp: Dispatcher):
     dp.register_callback_query_handler(predict_info, predict_callback.filter(), is_analytic=True, state="*", chat_type="private")
     dp.register_message_handler(analytic_start, commands=["start"], state="*", is_analytic=True, chat_type="private")
     dp.register_message_handler(cancel, text="отменить",
-                                state=[Predict.Check_Ticker, Predict.Set_Date, Predict.Confirm, Predict.Publish, Predict.Set_Target])
+                                state=[Predict.Check_Ticker, Predict.Set_Date, Predict.Confirm, Predict.Publish, Predict.Set_Target, Predict.Set_Risk])
 
-    dp.register_message_handler(back_to, text="назад", state=[Predict.Set_Date, Predict.Confirm, Predict.Publish, Predict.Set_Target])
+    dp.register_message_handler(back_to, text="назад", state=[Predict.Set_Date, Predict.Confirm, Predict.Publish, Predict.Set_Target, Predict.Set_Risk])
     dp.register_message_handler(make_predict, text="/predict", state='*', is_analytic=True)
     dp.register_message_handler(check_ticker, state=Predict.Check_Ticker)
     dp.register_message_handler(set_date, state=Predict.Set_Date)
     dp.register_message_handler(set_target, state=Predict.Set_Target)
+    dp.register_message_handler(set_risk, state=Predict.Set_Risk)
     dp.register_message_handler(confirm, state=Predict.Confirm)
     dp.register_message_handler(publish, text="опубликовать", state=Predict.Publish)
 
