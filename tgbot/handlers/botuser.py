@@ -181,6 +181,7 @@ async def predict_info(query: CallbackQuery, callback_data: dict):
     analytic_rating = predict.analytic.rating
     target = predict.predicted_value
     analytic_predicts_total=predict.analytic.predicts_total
+    risk_level = predict.risk_level
     instrument = await tinkoff.search_by_ticker(ticker, config)
     latestcost = await tinkoff.latestcost(figi=instrument['figi'], config=config)
     # latestcost = await tinkoff.get_latest_cost_history(figi=instrument['figi'], config=config,
@@ -192,12 +193,16 @@ async def predict_info(query: CallbackQuery, callback_data: dict):
         circle='🔴'
     else:
         circle='🟢'
+    risk = '⚡' * risk_level
+    if risk_level == 0:
+        risk = '⚡⚡'
     text = f'''
                 🏦<b>${ticker}</b> ({name})
 ⏱Дата начала: <b>{start_date.date():%d-%m-%Y}</b>                 
 ⏱Дата окончания:  <b>{predicted_date.date():%d-%m-%Y}</b>
 {circle}Прогноз: <b>{start_value} {currency}</b>➡<b>{target} {currency}</b>
 Цена сейчас: <b>{latestcost} {currency}</b>
+Уровень риска: {risk}
 Аналитик: <b>{analytic_nickname}</b>
 Рейтинг: <b>{analytic_rating}</b>
 Всего прогнозов: <b>{analytic_predicts_total}</b>
