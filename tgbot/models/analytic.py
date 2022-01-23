@@ -116,6 +116,7 @@ class Prediction(Base):
     message_url = Column(String(100), nullable=True)
     message_text = Column(String(2000), nullable=True)
     comment = Column(String(4000), nullable=True)
+    risk_level = Column(Integer, nullable=True)
 
     @classmethod
     async def add_predict(cls,
@@ -131,7 +132,8 @@ class Prediction(Base):
                           message_id: BigInteger,
                           message_url: str,
                           message_text: str,
-                          comment: str
+                          comment: str,
+                          risk_level: Integer
                           ) -> 'Prediction':
         prediction: Prediction = Prediction(ticker=ticker,
                                             name=name,
@@ -144,7 +146,8 @@ class Prediction(Base):
                                             message_id=message_id,
                                             message_url=message_url,
                                             message_text=message_text,
-                                            comment=comment)
+                                            comment=comment,
+                                            risk_level=risk_level)
         async with db_session() as db_session:
             db_session.add(prediction)
             await db_session.commit()
@@ -259,6 +262,7 @@ class Prediction(Base):
         predict_days = (end_date.date() - start_date.date()).days
         predict_days = await bdays.count_tdays(start_date, end_date)
         bonus=0
+        risk_level = self.risk_level
         try:
             if analytic.bonuscount > 0:
                 bonus=analytic.bonus
@@ -285,6 +289,23 @@ class Prediction(Base):
         predict_days=min(predict_days,21)
         delta=sign_profit*math.pow((min((22 - predict_days), 22)/22), 1/3)*math.pow(float(predicted_profit)/0.30, 1/3)*math.pow(min(abs(profit), predicted_profit)/predicted_profit, 1/3)
         rating = (1 + delta)/2
+        ##бонсуы за РИСКИ
+
+        risk_bonus = 0.8
+        if risk_level == 1:
+            if rating < 0.5:
+                rating = rating*risk_bonus
+            else:
+                rating = 1 - ((1-rating)*risk_bonus)
+
+        elif risk_level == 3:
+            if rating < 0.5:
+                rating = rating + (0.5 - rating)*(1-risk_bonus)
+            else:
+                rating = 0.5 + (rating-0.5)*risk_bonus
+        elif risk_level == 2:
+            pass
+
         #бонус ИНТРАДЕЙ
         intraday_bonus = 0.8
         if predict_days <2:
