@@ -329,14 +329,14 @@ async def set_risk(message: Message, state: FSMContext):
     try:
         risk_level = int(message.text)
     except ValueError:
-        await message.answer('вы ввели неверную цель')
+        await message.answer('вы ввели неверное значение уровеня риска\nвозможные значения - 1,2,3')
         async with state.proxy() as data:
             message.text = data['target']
         await Predict.Set_Date.set()
         await set_target(message, state)
         return
     if risk_level not in [1,2,3]:
-        await message.answer('вы ввели неверную цель\n возможные значения - 1,2,3')
+        await message.answer('вы ввели неверное значение уровеня риска\nвозможные значения - 1,2,3')
         async with state.proxy() as data:
             message.text = data['target']
         await Predict.Set_Date.set()
