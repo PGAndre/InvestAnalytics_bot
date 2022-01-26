@@ -105,6 +105,7 @@ class Prediction(Base):
     end_date = Column(DateTime)
     start_value = Column(Numeric(12, 2))
     predicted_value = Column(Numeric(12, 2), nullable=False)
+    stop_value = Column(Numeric(12, 2), nullable=True)
     end_value = Column(Numeric(12, 2))
     analytic_id = Column(BigInteger, ForeignKey(Analytic.telegram_id, ondelete="CASCADE"), nullable=False)
     rating = Column(Numeric(4, 2))
@@ -112,6 +113,7 @@ class Prediction(Base):
     is_active = Column(Boolean, default=True, nullable=False)
     analytic = relationship("Analytic", backref="analytic", lazy="joined")
     successful = Column(Boolean, default=False)
+    stopped = Column(Boolean, default=False, nullable=True)
     message_id = Column(BigInteger, nullable=True)
     message_url = Column(String(100), nullable=True)
     message_text = Column(String(2000), nullable=True)
@@ -133,7 +135,9 @@ class Prediction(Base):
                           message_url: str,
                           message_text: str,
                           comment: str,
-                          risk_level: Integer
+                          risk_level: Integer,
+                          stop_value: Numeric
+
                           ) -> 'Prediction':
         prediction: Prediction = Prediction(ticker=ticker,
                                             name=name,
@@ -147,7 +151,8 @@ class Prediction(Base):
                                             message_url=message_url,
                                             message_text=message_text,
                                             comment=comment,
-                                            risk_level=risk_level)
+                                            risk_level=risk_level,
+                                            stop_value=stop_value)
         async with db_session() as db_session:
             db_session.add(prediction)
             await db_session.commit()
@@ -223,9 +228,10 @@ class Prediction(Base):
                              successful :Boolean,
                              end_value: Numeric,
                              end_date: datetime,
-                             id: int):
+                             id: int,
+                             **updated_fields):
         async with db_session() as db_session:
-            sql = update(cls).where(cls.id == id).values(successful=successful, end_date=end_date, end_value=end_value)
+            sql = update(cls).where(cls.id == id).values(successful=successful, end_date=end_date, end_value=end_value,**updated_fields)
             await db_session.execute(sql)
             await db_session.commit()
 
