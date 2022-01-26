@@ -30,14 +30,26 @@ async def check_predicts():
 
 
 class PredictionAnalys():
-    def __init__(self, best_candle, first_candle_morethen_predicted, prediction_index):
+    def __init__(self,
+                 best_candle,
+                 first_candle_morethen_predicted,
+                 prediction_index,
+                 worst_candle,
+                 first_candle_lessthen_stop,
+                 stop_index):
         self.best_candle = best_candle
         self.first_candle_morethen_predicted = first_candle_morethen_predicted
         self.prediction_index = prediction_index
+        self.worst_candle = worst_candle
+        self.first_candle_lessthen_stop = first_candle_lessthen_stop
+        self.stop_index = stop_index
 
     best_candle: Candle
     first_candle_morethen_predicted: Candle
     prediction_index: decimal
+    worst_candle: Candle
+    first_candle_lessthen_stop: Candle
+    stop_index: decimal
 
 
 async def predictions_active():
@@ -104,8 +116,31 @@ async def predictions_active():
                 # print(f'ЗАВЕРШЕННЫЙ ПРЕДИКТ ИЗМЕНЕН В БАЗЕ: {prediction.__dict__}')
 
             else:
-                #print(f'pass')
-                pass
+                if predictionanalysis.stop_index >= 0:
+                    end_date = predictionanalysis.first_candle_lessthen_stop.time.replace(tzinfo=None)
+                    # print(f'прогноз сбылся раньше времени{type(end_date)}')
+                    end_value = prediction.stop_value
+                    successful = False
+                    stopped = True
+                    await Prediction.update_predict(db_session,
+                                                    successful=successful,
+                                                    end_value=end_value,
+                                                    end_date=end_date,
+                                                    id=prediction.id,
+                                                    stopped = stopped)
+                ##обработка автостопа не нужна, т.к. стопы будут выставляться всегда на этапе создания прогноза
+                # elif predictionanalysis.autostop_index >= 0 and prediction.stopped == False:
+                #     end_date = predictionanalysis.first_candle_lessthen_autostop.time.replace(tzinfo=None)
+                #     # print(f'прогноз сбылся раньше времени{type(end_date)}')
+                #     end_value = predictionanalysis.autostop_value
+                #     successful = False
+                #     stopped = True
+                #     await Prediction.update_predict(db_session,
+                #                                     successful=successful,
+                #                                     end_value=end_value,
+                #                                     end_date=end_date,
+                #                                     id=prediction.id,
+                #                                     stopped = stopped)
 
 
 # if predict-date + 1day < datetime.now() (срок прогноза истёк):
@@ -211,6 +246,14 @@ async def predictions_active_finished():
 Рейтинг прогноза: <b>{updated_prediction.rating}</b>
 Рейтинг аналитика <b>{analytic.Nickname}</b>: <b>{analytic.rating}</b>➡<b>{updated_analytic.rating}</b>
 Всего прогнозов: <b>{updated_analytic.predicts_total}</b>.'''
+                if prediction.stopped:
+                    text_tochannel = f'''⛔️СТОП ЛОСС Прогноза по акции <b><a href="{message_url}">${updated_prediction.ticker}</a></b>. 
+🏦Прогноз:<b>{updated_prediction.start_value} {updated_prediction.currency}</b>➡<b>{updated_prediction.predicted_value} {updated_prediction.currency}</b>
+Фактическое изменение: <b>{updated_prediction.start_value} {updated_prediction.currency}</b>➡<b>{updated_prediction.end_value} {updated_prediction.currency}</b>
+Рейтинг прогноза: <b>{updated_prediction.rating}</b>
+Рейтинг аналитика <b>{analytic.Nickname}</b>: <b>{analytic.rating}</b>➡<b>{updated_analytic.rating}</b>
+Всего прогнозов: <b>{updated_analytic.predicts_total}</b>.'''
+
 
             channel_message = await bot.send_message(chat_id=channel_id,
                                    text=text_tochannel)
@@ -230,12 +273,26 @@ async def predictions_active_finished():
                 await bot.edit_message_text(text=new_text + f'\nСтатус: 🚀<b><a href="{channel_message.url}">ЗАВЕРШЕН</a></b>',
                     chat_id=channel_id, message_id=message_id)
             else:
-                await bot.edit_message_text(text=new_text + f'\nСтатус: ❌<b><a href="{channel_message.url}">ЗАВЕРШЕН</a></b>',
+                if prediction.stopped:
+                    await bot.edit_message_text(
+                        text=new_text + f'\nСтатус: ⛔️<b><a href="{channel_message.url}">СТОП ЛОСС</a></b>',
+                        chat_id=channel_id, message_id=message_id)
+                else:
+                    await bot.edit_message_text(text=new_text + f'\nСтатус: ❌<b><a href="{channel_message.url}">ЗАВЕРШЕН</a></b>',
                     chat_id=channel_id, message_id=message_id)
 
 
 # noinspection PyTypeChecker
 async def prediction_candle_analys(prediction: Prediction, config: Config):
+    isLong = math.copysign(1, (prediction.predicted_value - prediction.start_value))
+    predict_sign = decimal.Decimal(math.copysign(1, (prediction.predicted_value - prediction.start_value)))
+    # #процент АВТОСТОПА
+    # autostop_percentage = 15
+    # # значение автостопа
+    # if isLong:
+    #     autostop_value = round(prediction.start_value*decimal.Decimal(1 - autostop_percentage/100),2)
+    # else:
+    #     autostop_value = round(prediction.start_value*decimal.Decimal(1 + autostop_percentage/100),2)
     #print(prediction.start_date.date() + timedelta(days=2))
     #print(datetime.now().date())
     if prediction.start_date.date() + timedelta(days=2) <= datetime.now().date():
@@ -243,7 +300,6 @@ async def prediction_candle_analys(prediction: Prediction, config: Config):
 
         #print(prediction.start_date + timedelta(hours=2))
         #print(datetime.utcnow())
-        isLong = math.copysign(1, (prediction.predicted_value - prediction.start_value))
         #print(isLong)
         candles_lasthour = (
             await get_candles_inrange(figi=prediction.figi, from_=datetime.utcnow()+ timedelta(hours=-2),
@@ -283,34 +339,73 @@ async def prediction_candle_analys(prediction: Prediction, config: Config):
         #print(all_candles)
         if isLong > 0:
             bestcandle = max(all_candles, key=lambda item: item.h)
+            worstcandle = min(all_candles, key=lambda item: item.l)
             candles_morethen_predicted = [x for x in all_candles if x.h >= prediction.predicted_value]
+            # candles_lessthen_autostop = [x for x in all_candles if x.l <= autostop_value]
+            try:
+                candles_lessthen_stop = [x for x in all_candles if x.l <= prediction.stop_value]
+            except TypeError:
+                candles_lessthen_stop = []
             #print(f'maxof_candles.h: {bestcandle.h}')
         else:
             bestcandle = min(all_candles, key=lambda item: item.l)
+            worstcandle = max(all_candles, key=lambda item: item.h)
             candles_morethen_predicted = [x for x in all_candles if x.l <= prediction.predicted_value]
+            # candles_lessthen_autostop = [x for x in all_candles if x.h >= autostop_value]
+            try:
+                candles_lessthen_stop = [x for x in all_candles if x.h >= prediction.stop_value]
+            except:
+                candles_lessthen_stop = []
             #print(f'minof_candles_daily.h: {bestcandle.l}')
 
-        if not candles_morethen_predicted:
-            predictionanalysis = PredictionAnalys(bestcandle, bestcandle, prediction_index=1)
-            return predictionanalysis
+        # временно убрать!
 
-        first_candle_morethen_predicted = min(candles_morethen_predicted, key=lambda item: item.time)
+        # if not candles_morethen_predicted:
+        #     predictionanalysis = PredictionAnalys(bestcandle, bestcandle, prediction_index=1)
+        #     return predictionanalysis
+        try:
+            first_candle_morethen_predicted = min(candles_morethen_predicted, key=lambda item: item.time)
+        except ValueError:
+            first_candle_morethen_predicted = bestcandle
+        try:
+            first_candle_lessthen_stop = min(candles_lessthen_stop, key=lambda item: item.time)
+        except ValueError:
+            first_candle_lessthen_stop = worstcandle
+        # try:
+        #     first_candle_lessthen_autostop = min(candles_lessthen_autostop, key=lambda item: item.time)
+        # except ValueError:
+        #     first_candle_lessthen_autostop = worstcandle
         #pprint.pprint(f'первая свеча в которых предикт сбылся за всё время : {first_candle_morethen_predicted}')
 
         if isLong > 0:
             current_difference = prediction.predicted_value - bestcandle.h
+            # current_autostop_difference = autostop_value - worstcandle.l
+            try:
+                current_stop_difference = prediction.stop_value - worstcandle.l
+            except TypeError:
+                current_stop_difference = -1
         else:
             current_difference = prediction.predicted_value - bestcandle.l
+            # current_autostop_difference = autostop_value - worstcandle.h
+            try:
+                current_stop_difference = prediction.stop_value - worstcandle.h
+            except:
+                current_stop_difference = 1
 
         #print(current_difference)
-        predict_sign = decimal.Decimal(math.copysign(1, (prediction.predicted_value - prediction.start_value)))
         #print(predict_sign)
         prediction_index = current_difference * predict_sign
+        stop_index = current_stop_difference * predict_sign
+        # autostop_index = current_autostop_difference * predict_sign
         #print(f'текущая индекс предсказания (сбылся в случае если отрицательное значение): {prediction_index}')
         # выше мы нашли максимальное значение из свечей в двух диапазонах: в первый день почасовые свечи, после этого посуточные свечи. Взяли максимальную из них по значению Candle.h
         #print(prediction.predicted_date.date() + timedelta(days=1))
-        predictionAnalys: PredictionAnalys = PredictionAnalys(bestcandle, first_candle_morethen_predicted,
-                                                              prediction_index)
+        predictionAnalys: PredictionAnalys = PredictionAnalys(bestcandle,
+                                                              first_candle_morethen_predicted,
+                                                              prediction_index,
+                                                              worstcandle,
+                                                              first_candle_lessthen_stop,
+                                                              stop_index)
         return predictionAnalys
 
 
@@ -320,7 +415,6 @@ async def prediction_candle_analys(prediction: Prediction, config: Config):
         #print(datetime.utcnow())
         # to_time = (prediction.start_date + timedelta(hours=1)).replace(minute=59, second=0)
         # print(to_time)
-        isLong = math.copysign(1, (prediction.predicted_value - prediction.start_value))
         #print(isLong)
         candles_firsthour = (
             await get_candles_inrange(figi=prediction.figi, from_=prediction.start_date + timedelta(hours=-1),
@@ -355,101 +449,167 @@ async def prediction_candle_analys(prediction: Prediction, config: Config):
         #print(all_candles)
         if isLong > 0:
             bestcandle = max(all_candles, key=lambda item: item.h)
+            worstcandle = min(all_candles, key=lambda item: item.l)
             candles_morethen_predicted = [x for x in all_candles if x.h >= prediction.predicted_value]
+            # candles_lessthen_autostop = [x for x in all_candles if x.l <= autostop_value]
+            try:
+                candles_lessthen_stop = [x for x in all_candles if x.l <= prediction.stop_value]
+            except TypeError:
+                candles_lessthen_stop = []
             #print(f'maxof_candles.h: {bestcandle.h}')
         else:
             bestcandle = min(all_candles, key=lambda item: item.l)
+            worstcandle = max(all_candles, key=lambda item: item.h)
             candles_morethen_predicted = [x for x in all_candles if x.l <= prediction.predicted_value]
+            # candles_lessthen_autostop = [x for x in all_candles if x.h >= autostop_value]
+            try:
+                candles_lessthen_stop = [x for x in all_candles if x.h >= prediction.stop_value]
+            except:
+                candles_lessthen_stop = []
             #print(f'minof_candles_daily.h: {bestcandle.l}')
 
-        if not candles_morethen_predicted:
-            predictionanalysis = PredictionAnalys(bestcandle, bestcandle, prediction_index=1)
-            return predictionanalysis
+        # временно убрать!
 
-        first_candle_morethen_predicted = min(candles_morethen_predicted, key=lambda item: item.time)
-        #pprint.pprint(f'первая свеча в которых предикт сбылся за всё время : {first_candle_morethen_predicted}')
+        # if not candles_morethen_predicted:
+        #     predictionanalysis = PredictionAnalys(bestcandle, bestcandle, prediction_index=1)
+        #     return predictionanalysis
+        try:
+            first_candle_morethen_predicted = min(candles_morethen_predicted, key=lambda item: item.time)
+        except ValueError:
+            first_candle_morethen_predicted = bestcandle
+        try:
+            first_candle_lessthen_stop = min(candles_lessthen_stop, key=lambda item: item.time)
+        except ValueError:
+            first_candle_lessthen_stop = worstcandle
+        # try:
+        #     first_candle_lessthen_autostop = min(candles_lessthen_autostop, key=lambda item: item.time)
+        # except ValueError:
+        #     first_candle_lessthen_autostop = worstcandle
 
         if isLong > 0:
             current_difference = prediction.predicted_value - bestcandle.h
+            # current_autostop_difference = autostop_value - worstcandle.l
+            try:
+                current_stop_difference = prediction.stop_value - worstcandle.l
+            except TypeError:
+                current_stop_difference = -1
         else:
             current_difference = prediction.predicted_value - bestcandle.l
+            # current_autostop_difference = autostop_value - worstcandle.h
+            try:
+                current_stop_difference = prediction.stop_value - worstcandle.h
+            except:
+                current_stop_difference = 1
 
         #print(current_difference)
-        predict_sign = decimal.Decimal(math.copysign(1, (prediction.predicted_value - prediction.start_value)))
         #print(predict_sign)
         prediction_index = current_difference * predict_sign
+        stop_index = current_stop_difference * predict_sign
+        # autostop_index = current_autostop_difference * predict_sign
         #print(f'текущая индекс предсказания (сбылся в случае если отрицательное значение): {prediction_index}')
         # выше мы нашли максимальное значение из свечей в двух диапазонах: в первый день почасовые свечи, после этого посуточные свечи. Взяли максимальную из них по значению Candle.h
         #print(prediction.predicted_date.date() + timedelta(days=1))
-        predictionAnalys: PredictionAnalys = PredictionAnalys(bestcandle, first_candle_morethen_predicted,
-                                                              prediction_index)
+        predictionAnalys: PredictionAnalys = PredictionAnalys(bestcandle,
+                                                              first_candle_morethen_predicted,
+                                                              prediction_index,
+                                                              worstcandle,
+                                                              first_candle_lessthen_stop,
+                                                              stop_index)
         return predictionAnalys
 
     else:
         #print('меньше двух часов')
         to_time = (prediction.start_date + timedelta(hours=1)).replace(minute=59, second=0)
         #print(to_time)
-        isLong = math.copysign(1, (prediction.predicted_value - prediction.start_value))
         #print(isLong)
         candles_firsthour = (
             await get_candles_inrange(figi=prediction.figi, from_=prediction.start_date + timedelta(hours=-2),
                                       to=datetime.utcnow(), interval='minute',
                                       config=config)).candles
-        if not candles_firsthour:
-            predictionanalysis = None
-            return predictionanalysis
+        # if not candles_firsthour:
+        #     predictionanalysis = None
+        #     return predictionanalysis
 
         #print(f'dfgkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkk')
 
         candles_firsthour = [x for x in candles_firsthour if x.time.replace(tzinfo=None) >= prediction.start_date]
         candles_firsthour = [x for x in candles_firsthour if x.time.replace(tzinfo=None) <= prediction.predicted_date]
 
-        if not candles_firsthour:
+        all_candles = candles_firsthour
+
+        if not all_candles:
             predictionanalysis = None
             return predictionanalysis
-        else:
-            if isLong > 0:
-                bestcandle_firsthour = max(candles_firsthour, key=lambda item: item.h)
-                candles_morethen_predicted_firsthour = [x for x in candles_firsthour if
-                                                        x.h >= prediction.predicted_value]
-            else:
-                bestcandle_firsthour = min(candles_firsthour, key=lambda item: item.l)
-                candles_morethen_predicted_firsthour = [x for x in candles_firsthour if
-                                                        x.l <= prediction.predicted_value]
-                #print(bestcandle_firsthour.__dict__)
-        #pprint.pprint(f'свечи в которых предикт сбылся за первый час: {candles_morethen_predicted_firsthour}')
-
-        if not candles_morethen_predicted_firsthour:
-            predictionanalysis = PredictionAnalys(bestcandle_firsthour, bestcandle_firsthour, prediction_index=1)
-            return predictionanalysis
-
-            ##<---- вот это значение наму нужно(снизу)
-        # try:
-        first_candle_morethen_predicted = min(candles_morethen_predicted_firsthour, key=lambda item: item.time)
 
         if isLong > 0:
-            current_difference = prediction.predicted_value - bestcandle_firsthour.h
+            bestcandle = max(all_candles, key=lambda item: item.h)
+            worstcandle = min(all_candles, key=lambda item: item.l)
+            candles_morethen_predicted = [x for x in all_candles if x.h >= prediction.predicted_value]
+            # candles_lessthen_autostop = [x for x in all_candles if x.l <= autostop_value]
+            try:
+                candles_lessthen_stop = [x for x in all_candles if x.l <= prediction.stop_value]
+            except TypeError:
+                candles_lessthen_stop = []
+            #print(f'maxof_candles.h: {bestcandle.h}')
         else:
-            current_difference = prediction.predicted_value - bestcandle_firsthour.l
+            bestcandle = min(all_candles, key=lambda item: item.l)
+            worstcandle = max(all_candles, key=lambda item: item.h)
+            candles_morethen_predicted = [x for x in all_candles if x.l <= prediction.predicted_value]
+            # candles_lessthen_autostop = [x for x in all_candles if x.h >= autostop_value]
+            try:
+                candles_lessthen_stop = [x for x in all_candles if x.h >= prediction.stop_value]
+            except:
+                candles_lessthen_stop = []
+            #print(f'minof_candles_daily.h: {bestcandle.l}')
+
+        # временно убрать!
+
+        # if not candles_morethen_predicted:
+        #     predictionanalysis = PredictionAnalys(bestcandle, bestcandle, prediction_index=1)
+        #     return predictionanalysis
+        try:
+            first_candle_morethen_predicted = min(candles_morethen_predicted, key=lambda item: item.time)
+        except ValueError:
+            first_candle_morethen_predicted = bestcandle
+        try:
+            first_candle_lessthen_stop = min(candles_lessthen_stop, key=lambda item: item.time)
+        except ValueError:
+            first_candle_lessthen_stop = worstcandle
+        # try:
+        #     first_candle_lessthen_autostop = min(candles_lessthen_autostop, key=lambda item: item.time)
+        # except ValueError:
+        #     first_candle_lessthen_autostop = worstcandle
+
+        if isLong > 0:
+            current_difference = prediction.predicted_value - bestcandle.h
+            # current_autostop_difference = autostop_value - worstcandle.l
+            try:
+                current_stop_difference = prediction.stop_value - worstcandle.l
+            except TypeError:
+                current_stop_difference = -1
+        else:
+            current_difference = prediction.predicted_value - bestcandle.l
+            # current_autostop_difference = autostop_value - worstcandle.h
+            try:
+                current_stop_difference = prediction.stop_value - worstcandle.h
+            except:
+                current_stop_difference = 1
+
         #print(current_difference)
-        predict_sign = decimal.Decimal(math.copysign(1, (prediction.predicted_value - prediction.start_value)))
         #print(predict_sign)
         prediction_index = current_difference * predict_sign
+        stop_index = current_stop_difference * predict_sign
+        # autostop_index = current_autostop_difference * predict_sign
         #print(f'текущая индекс предсказания (сбылся в случае если отрицательное значение): {prediction_index}')
         # выше мы нашли максимальное значение из свечей в двух диапазонах: в первый день почасовые свечи, после этого посуточные свечи. Взяли максимальную из них по значению Candle.h
         #print(prediction.predicted_date.date() + timedelta(days=1))
-        predictionAnalys: PredictionAnalys = PredictionAnalys(bestcandle_firsthour, first_candle_morethen_predicted,
-                                                              prediction_index)
+        predictionAnalys: PredictionAnalys = PredictionAnalys(bestcandle,
+                                                              first_candle_morethen_predicted,
+                                                              prediction_index,
+                                                              worstcandle,
+                                                              first_candle_lessthen_stop,
+                                                              stop_index)
         return predictionAnalys
-    # await message.bot.send_message(chat_id=channel_id,
-    #                                text=text,
-    #                                reply_markup=InlineKeyboardMarkup(inline_keyboard=[
-    #                                    [
-    #                                        InlineKeyboardButton(text="Open Tinkoff",
-    #                                                             url=f'https://www.tinkoff.ru/invest/stocks/{ticker}')
-    #                                    ],
-    #                                ])
-    #                                )
 
 
 async def calculate_rating_job():
@@ -457,5 +617,5 @@ async def calculate_rating_job():
     await predictions_active_finished()
 
 #
-# asyncio.run(predictions_active())
-# asyncio.run(predictions_active_finished())
+asyncio.run(predictions_active())
+asyncio.run(predictions_active_finished())
