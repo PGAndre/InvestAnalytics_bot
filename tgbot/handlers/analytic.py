@@ -503,6 +503,7 @@ async def publish(message: Message, state: FSMContext):
         analytic_predicts_total = data['predicts_total']
         risk_level = data['risk_level']
         stop = data['stop']
+        await state.finish()
         predicted_date = await bdays.next_business_day(datetime.utcnow(), predict_time)
         instrument = await tinkoff.search_by_ticker(ticker, config)
         latestcost = await tinkoff.latestcost(figi=instrument['figi'], config=config)
@@ -575,7 +576,7 @@ async def publish(message: Message, state: FSMContext):
                                                           comment=comment,
                                                           risk_level=risk_level,
                                                           stop_value=stop_value)
-    await state.finish()
+
 
 
 async def my_active_predicts(query: CallbackQuery):
@@ -855,6 +856,7 @@ async def publish_comment(message: Message, state: FSMContext):
         comment = data['comment']
         message_id = data['message_id']
         message_text = data['message_text']
+        await state.finish()
     channel_id = config.tg_bot.channel_id
     await message.answer(text=text_tochannel,
                          reply_markup=ReplyKeyboardRemove())
@@ -874,8 +876,6 @@ async def publish_comment(message: Message, state: FSMContext):
     #new_text = message_text + f'\nДобавлен коментарий:'
     await message.bot.edit_message_text(text=new_text + f'\nСтатус:📈<b>АКТИВЕН</b>',
                                 chat_id=channel_id, message_id=message_id)
-
-    await state.finish()
 
 
 

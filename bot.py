@@ -1,4 +1,5 @@
 import asyncio
+import logging
 from logging.handlers import RotatingFileHandler
 
 import aiogram
@@ -102,7 +103,7 @@ async def main():
         CronTrigger(hour='23', minute='1'),
     ])
     scheduler.add_job(kick_users_notmember, trigger_kick_notmembers)
-    logging.getLogger('apscheduler.executors.default').setLevel(logging.INFO)
+    logging.getLogger('apscheduler.executors.default').setLevel(logging.WARNING)
     #scheduler.add_job(kick_users, 'interval', seconds=5)
 
     #register_all_middlewares(dp)
