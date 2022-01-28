@@ -617,5 +617,5 @@ async def calculate_rating_job():
     await predictions_active_finished()
 
 #
-asyncio.run(predictions_active())
-asyncio.run(predictions_active_finished())
+# asyncio.run(predictions_active())
+# asyncio.run(predictions_active_finished())

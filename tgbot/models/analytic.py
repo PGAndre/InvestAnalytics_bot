@@ -1,6 +1,7 @@
 import asyncio
 import datetime
 import decimal
+import logging
 import math
 from contextlib import suppress
 from decimal import Decimal
@@ -259,6 +260,7 @@ class Prediction(Base):
 
 
     async def calculate_rating(self, analytic):
+        logger = logging.getLogger(__name__)
         end_value = self.end_value
         predicted_value = self.predicted_value
         start_value = self.start_value
@@ -291,7 +293,7 @@ class Prediction(Base):
         # predict_sign = decimal.Decimal(math.copysign(1, (prediction.predicted_value - prediction.start_value)))
         # print(predict_sign)
         # prediction_index = current_difference * predict_sign
-        bonus=random.randrange(bonus*100-20,bonus*100+20,1)/100
+        # bonus=random.randrange(bonus*100-20,bonus*100+20,1)/100
         predict_days=min(predict_days,21)
         delta=sign_profit*math.pow((min((22 - predict_days), 22)/22), 1/3)*math.pow(float(predicted_profit)/0.30, 1/3)*math.pow(min(abs(profit), predicted_profit)/predicted_profit, 1/3)
         rating = (1 + delta)/2
@@ -301,21 +303,31 @@ class Prediction(Base):
         if risk_level == 1:
             if rating < 0.5:
                 rating = rating*risk_bonus
-            else:
+                logger.info(f'rating = rating*risk_bonus, risk_level == 1:')
+            elif rating > 0.5:
                 rating = 1 - ((1-rating)*risk_bonus)
+                logger.info(f'rating = 1 - ((1-rating)*risk_bonus), risk_level == 1:')
+            else:
+                logger.info(f'рейтинг = 50')
 
         elif risk_level == 3:
             if rating < 0.5:
                 rating = rating + (0.5 - rating)*(1-risk_bonus)
-            else:
+                logger.info(f'rating = rating + (0.5 - rating)*(1-risk_bonus), risk_level == 3:')
+            elif rating > 0.5:
                 rating = 0.5 + (rating-0.5)*risk_bonus
+                logger.info(f'rating = 0.5 + (rating-0.5)*risk_bonus, risk_level == 3:')
+            else:
+                logger.info(f'рейтинг = 50')
         elif risk_level == 2:
-            pass
+            logger.info(f'risk_level == 2:')
 
         #бонус ИНТРАДЕЙ
         intraday_bonus = 0.8
         if predict_days <2:
-            rating = 1 - ((1-rating)*intraday_bonus)
+            if rating > 0.5:
+                rating = 1 - ((1-rating)*intraday_bonus)
+                logger.info(f'ИНТРАДЕЙ БОНУС для прогноза {self.ticker}')
 #        rating = (31 - predict_days)/30
         rating_rounded = round(rating*100, 2)
         overbonus=random.randrange(180,220,1)/100
@@ -328,6 +340,9 @@ class Prediction(Base):
             if rating_rounded > 50:
                 rating_rounded = 50-overbonus
         rating_rounded = round(rating_rounded,2)
+        if start_value == end_value:
+            logger.info(f'ЦЕНА не изменилась в прогнозе {self.ticker}')
+            rating_rounded = 50
         # print(math.pow(min((22 - predict_days), 22)/22, 1/3))
         # print(math.pow(float(predicted_profit)/0.30, 1/3))
         # print(math.pow(min(abs(profit), predicted_profit)/predicted_profit, 1/3))
