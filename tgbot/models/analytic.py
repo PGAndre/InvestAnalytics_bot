@@ -303,24 +303,24 @@ class Prediction(Base):
         if risk_level == 1:
             if rating < 0.5:
                 rating = rating*risk_bonus
-                logger.info(f'rating = rating*risk_bonus, risk_level == 1:')
+                logger.info(f'{self.ticker}, rating = rating*risk_bonus, risk_level == 1:')
             elif rating > 0.5:
                 rating = 1 - ((1-rating)*risk_bonus)
-                logger.info(f'rating = 1 - ((1-rating)*risk_bonus), risk_level == 1:')
+                logger.info(f'{self.ticker}, rating = 1 - ((1-rating)*risk_bonus), risk_level == 1:')
             else:
-                logger.info(f'рейтинг = 50')
+                logger.info(f'{self.ticker}, рейтинг = 50')
 
         elif risk_level == 3:
             if rating < 0.5:
                 rating = rating + (0.5 - rating)*(1-risk_bonus)
-                logger.info(f'rating = rating + (0.5 - rating)*(1-risk_bonus), risk_level == 3:')
+                logger.info(f'{self.ticker}, rating = rating + (0.5 - rating)*(1-risk_bonus), risk_level == 3:')
             elif rating > 0.5:
                 rating = 0.5 + (rating-0.5)*risk_bonus
-                logger.info(f'rating = 0.5 + (rating-0.5)*risk_bonus, risk_level == 3:')
+                logger.info(f'{self.ticker}, rating = 0.5 + (rating-0.5)*risk_bonus, risk_level == 3:')
             else:
-                logger.info(f'рейтинг = 50')
+                logger.info(f'{self.ticker}, рейтинг = 50')
         elif risk_level == 2:
-            logger.info(f'risk_level == 2:')
+            logger.info(f'{self.ticker}, risk_level == 2:')
 
         #бонус ИНТРАДЕЙ
         intraday_bonus = 0.8
