@@ -145,13 +145,57 @@ async def get_predict_list(query: CallbackQuery):
     logger=logging.getLogger(__name__)
     # список всех предиктов is_active
     predictions: list[Prediction] = await Prediction.get_active_predicts(db_session=db_session)
-    markup= InlineKeyboardMarkup(row_width=5)
-    for prediction in predictions:
-        button_text = f'${prediction.ticker}'
-        callback_data = user_predict_callback.new(ticker=prediction.ticker)
-        markup.insert(
-            InlineKeyboardButton(text=button_text, callback_data=callback_data)
-        )
+    markup= InlineKeyboardMarkup(row_width=4)
+    db_session = query.bot.get('db')
+    active_analytics: list[Analytic] = await Analytic.get_analytics(db_session=db_session, active=True)
+    for active_analytic in active_analytics:
+        analytic_id = active_analytic.telegram_id
+        active_predicts: list[Prediction] = await Prediction.get_predict_by_analytic(db_session=db_session,
+                                                                                        analytic_id=analytic_id)
+    # for prediction in predictions:
+    #     pass
+        predictions_long = []
+        predictions_short = []
+        active_preicts_list = []
+        for prediction in active_predicts:
+            active_preicts_list.append(prediction)
+            target = prediction.predicted_value
+            start_value = prediction.start_value
+            profit = target - start_value
+            sign_profit = math.copysign(1, profit)
+            if sign_profit == 1:
+                predictions_long.append(prediction)
+            elif sign_profit == -1:
+                predictions_short.append(prediction)
+        prediction_long_buttons = []
+        for prediction_long in predictions_long:
+            circle = '🟢'
+            button_text = f'{circle}${prediction_long.ticker}'
+            callback_data = user_predict_callback.new(ticker=prediction_long.ticker, action="info")
+            button = InlineKeyboardButton(text=button_text, callback_data=callback_data)
+            prediction_long_buttons.append(button)
+            # markup.insert(
+            #     InlineKeyboardButton(text=button_text, callback_data=callback_data)
+            # )
+        prediction_short_buttons = []
+        for prediction_short in predictions_short:
+            circle = '🔴'
+            button_text = f'{circle}${prediction_short.ticker}'
+            callback_data = user_predict_callback.new(ticker=prediction_short.ticker, action="info")
+            button = InlineKeyboardButton(text=button_text, callback_data=callback_data)
+            prediction_short_buttons.append(button)
+
+
+            # button_text = f'{circle}${prediction.ticker}'
+            # callback_data = user_predict_callback.new(ticker=prediction.ticker)
+            # markup.insert(
+            #     InlineKeyboardButton(text=button_text, callback_data=callback_data)
+            # )
+        callback_data = user_list_analytic_callback.new(id=analytic_id, is_active=True, action='list')
+        if active_preicts_list != []:
+            markup.add(InlineKeyboardButton(text=f'Прогнозы Аналитика 📈{active_analytic.Nickname}', callback_data=callback_data))
+        markup.add(*prediction_long_buttons)
+        markup.add(*prediction_short_buttons)
     markup.row(
         InlineKeyboardButton('Главное меню', callback_data=user_callback.new(action='main'))
     )
@@ -172,66 +216,60 @@ async def predict_info(query: CallbackQuery, callback_data: dict):
     ticker=callback_data.get('ticker')
     # logger.info(f'{ticker}')
     predict = await Prediction.get_predict(db_session=db_session, ticker=ticker)
-    name = predict.name
-    start_value = predict.start_value
+#     name = predict.name
+#     start_value = predict.start_value
+#     start_date = predict.start_date
+#     predicted_date = predict.predicted_date
+#     analytic_nickname = predict.analytic.Nickname
+#     analytic_rating = predict.analytic.rating
+#     target = predict.predicted_value
+#     analytic_predicts_total=predict.analytic.predicts_total
+#     # latestcost = await tinkoff.get_latest_cost_history(figi=instrument['figi'], config=config,
+#     #                                                    to_time=datetime.utcnow())
+#     comment = predict.comment
+#     profit=target-start_value
+#     sign_profit = math.copysign(1, profit)
+#     if sign_profit==-1:
+#         circle='🔴'
+#     else:
+#         circle='🟢'
+#     risk = '⚡' * risk_level
+#     if risk_level == 0:
+#         risk = '⚡⚡'
+#     text = f'''
+#                 🏦<b>${ticker}</b> ({name})
+# ⏱Дата начала: <b>{start_date.date():%d-%m-%Y}</b>
+# ⏱Дата окончания:  <b>{predicted_date.date():%d-%m-%Y}</b>
+# {circle}Прогноз: <b>{start_value} {currency}</b>➡<b>{target} {currency}</b>
+# Цена сейчас: <b>{latestcost} {currency}</b>
+# Уровень риска: {risk}
+# Аналитик: <b>{analytic_nickname}</b>
+# Рейтинг: <b>{analytic_rating}</b>
+# Всего прогнозов: <b>{analytic_predicts_total}</b>
+# Коментарий от аналитика: {comment}'''
+##     risk_level = predict.risk_level
     currency = predict.currency
-    start_date = predict.start_date
-    predicted_date = predict.predicted_date
-    analytic_nickname = predict.analytic.Nickname
-    analytic_rating = predict.analytic.rating
-    target = predict.predicted_value
-    analytic_predicts_total=predict.analytic.predicts_total
-    risk_level = predict.risk_level
-    stop_value = predict.stop_value
     instrument = await tinkoff.search_by_ticker(ticker, config)
     latestcost = await tinkoff.latestcost(figi=instrument['figi'], config=config)
-    # latestcost = await tinkoff.get_latest_cost_history(figi=instrument['figi'], config=config,
-    #                                                    to_time=datetime.utcnow())
-    comment = predict.comment
-    profit=target-start_value
-    sign_profit = math.copysign(1, profit)
-    if sign_profit==-1:
-        circle='🔴'
-    else:
-        circle='🟢'
-    risk = '⚡' * risk_level
-    if risk_level == 0:
-        risk = '⚡⚡'
+    markup= InlineKeyboardMarkup(row_width=4)
+    markup.row(InlineKeyboardButton(text="Cсылка на прогноз", url=f'{predict.message_url}'))
+    markup.insert(InlineKeyboardButton(text="Open in Tinkoff", url=f'https://www.tinkoff.ru/invest/stocks/{ticker}'))
+    markup.row(InlineKeyboardButton(text='К списку активных прогнозов',
+                                    callback_data=user_predict_callback.new(ticker=ticker, action='back')))
+    markup.row(
+        InlineKeyboardButton('Главное меню', callback_data=user_callback.new(action='main'))
+    )
+    new_text = await predict.edit_message_text(db_session=db_session)
+    new_text += f'\nЦена сейчас: <b>{latestcost} {currency}</b>'
+    # await query.message.answer(text=new_text,
+    #                                reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+    #                                    [
+    #                                        InlineKeyboardButton(text="Open in Tinkoff",
+    #                                                             url=f'https://www.tinkoff.ru/invest/stocks/{ticker}')
+    #                                    ],
+    #                                ]))
 
-    text = f'''
-                🏦<b>${ticker}</b> ({name})
-⏱Дата начала: <b>{start_date.date():%d-%m-%Y}</b>                 
-⏱Дата окончания:  <b>{predicted_date.date():%d-%m-%Y}</b>
-{circle}Прогноз: <b>{start_value} {currency}</b>➡<b>{target} {currency}</b>
-⛔СТОП ЛОСС: <b>{stop_value} {currency}</b>
-Цена сейчас: <b>{latestcost} {currency}</b>
-Уровень риска: {risk}
-Аналитик: <b>{analytic_nickname}</b>
-Рейтинг: <b>{analytic_rating}</b>
-Всего прогнозов: <b>{analytic_predicts_total}</b>
-Коментарий от аналитика: {comment}'''
-
-    if not stop_value:
-        text = f'''
-                🏦<b>${ticker}</b> ({name})
-⏱Дата начала: <b>{start_date.date():%d-%m-%Y}</b>                 
-⏱Дата окончания:  <b>{predicted_date.date():%d-%m-%Y}</b>
-{circle}Прогноз: <b>{start_value} {currency}</b>➡<b>{target} {currency}</b>
-⛔СТОП ЛОСС: <b>Не задан (только ручная отмена аналитиком)</b>
-Цена сейчас: <b>{latestcost} {currency}</b>
-Уровень риска: {risk}
-Аналитик: <b>{analytic_nickname}</b>
-Рейтинг: <b>{analytic_rating}</b>
-Всего прогнозов: <b>{analytic_predicts_total}</b>
-Коментарий от аналитика: {comment}'''
-
-    await query.message.answer(text=text,
-                                   reply_markup=InlineKeyboardMarkup(inline_keyboard=[
-                                       [
-                                           InlineKeyboardButton(text="Open in Tinkoff",
-                                                                url=f'https://www.tinkoff.ru/invest/stocks/{ticker}')
-                                       ],
-                                   ]))
+    await query.message.edit_text(text=new_text, reply_markup=markup)
 
 async def subscription_info(query: CallbackQuery):
     user: User = await user_add_or_update(query, role='user', module=__name__)
@@ -634,7 +672,9 @@ def register_botuser(dp: Dispatcher):
     dp.register_callback_query_handler(subscription_edit, user_callback.filter(action='sub_buy'), chat_type="private")
     dp.register_callback_query_handler(subscription_approve, user_callback.filter(action='sub_approve'), chat_type="private")
     dp.register_callback_query_handler(get_predict_list, user_callback.filter(action='pred'), state="*", chat_type="private")
-    dp.register_callback_query_handler(predict_info, user_predict_callback.filter(), state="*", chat_type="private")
+    dp.register_callback_query_handler(get_predict_list, user_predict_callback.filter(action="back"), state="*",
+                                       chat_type="private")
+    dp.register_callback_query_handler(predict_info, user_predict_callback.filter(action="info"), state="*", chat_type="private")
     dp.register_callback_query_handler(list_analytics, user_callback.filter(action='analytic'), state="*", chat_type="private")
     dp.register_callback_query_handler(choose_analytic, user_list_analytic_callback.filter(), state="*", chat_type="private")
     dp.register_callback_query_handler(get_invitelink, user_callback.filter(action='link'), chat_type="private")
