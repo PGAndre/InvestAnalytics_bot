@@ -95,3 +95,10 @@ async def user_add_or_update(obj, role: str, module: str) -> User:
 
 
     return user
+
+#проверка кол-ва знаков после запятой
+async def num_after_point(x):
+    s = str(x)
+    if not '.' in s:
+        return 0
+    return len(s) - s.index('.') - 1
