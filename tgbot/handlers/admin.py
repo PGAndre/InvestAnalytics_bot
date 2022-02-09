@@ -301,7 +301,7 @@ async def second_menu(query: CallbackQuery):
 
 
 async def link_menu(query: CallbackQuery):
-    user: User = await user_add_or_update(query, role='user', module=__name__)
+    user: User = await user_add_or_update(query, role='admin', module=__name__)
     await query.answer()
     await query.message.edit_text(
         text=link_menu_message(),
