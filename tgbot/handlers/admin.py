@@ -332,7 +332,7 @@ def register_admin(dp: Dispatcher):
     dp.register_callback_query_handler(choose_analytic, list_analytic_callback.filter(action='list'), is_admin=True, state="*", chat_type="private")
     dp.register_callback_query_handler(act_deact_analytic, list_analytic_callback.filter(action='act_deact'), is_admin=True, state="*", chat_type="private")
     dp.register_callback_query_handler(myinfo, admin_callback.filter(action='myinfo'), state="*", chat_type="private")
-    dp.register_callback_query_handler(link_menu, admin_callback.filter(action='link'), chat_type="private")
+    dp.register_callback_query_handler(link_menu, admin_callback.filter(action='link'), is_admin=True, chat_type="private")
     dp.register_callback_query_handler(get_channel_invitelink, admin_callback.filter(action='link_channel'), chat_type="private")
     dp.register_callback_query_handler(get_chat_invitelink, admin_callback.filter(action='link_chat'), chat_type="private")
     dp.register_message_handler(menu, commands=["menu"], state="*", is_admin=True, chat_type="private")
