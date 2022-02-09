@@ -124,6 +124,11 @@ async def chat_member_update(chat_member: ChatMemberUpdated):
             logger.info(user.__dict__)
 
 
+async def private_group_update(chat_member: ChatMemberUpdated):
+    config = chat_member.bot.get('config')
+    chat_id = config.tg_bot.private_group_id
+    await misc.chat_member_update(chat_member, chat_column_name = 'is_private_group_member', chat_id=chat_id, module=__name__)
+
 async def group_member_update(chat_member: ChatMemberUpdated):
     logger=logging.getLogger(__name__)
     chat_member = chat_member
@@ -160,3 +165,6 @@ async def group_member_update(chat_member: ChatMemberUpdated):
 def register_channeluser(dp: Dispatcher):
     dp.register_chat_member_handler(group_member_update, group_chat_member)
     dp.register_chat_member_handler(chat_member_update, channel_chat_member)
+    dp.register_chat_member_handler(private_group_update, private_group_member_filter)
+
+

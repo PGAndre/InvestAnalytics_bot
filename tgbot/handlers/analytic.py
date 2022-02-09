@@ -51,6 +51,14 @@ async def second_menu(query: CallbackQuery):
         reply_markup=second_menu_keyboard())
 
 
+async def link_menu(query: CallbackQuery):
+    user: User = await user_add_or_update(query, role='user', module=__name__)
+    await query.answer()
+    await query.message.edit_text(
+        text=link_menu_message(),
+        reply_markup=link_menu_keyboard())
+
+
 async def analytic_start(message: Message):
     user: User = await user_add_or_update(message, role='analytic', module=__name__)
 
@@ -61,7 +69,7 @@ async def analytic_start(message: Message):
     ''')
 
 
-async def get_invitelink(query: CallbackQuery):
+async def get_channel_invitelink(query: CallbackQuery):
     user: User = await user_add_or_update(query, role='analytic', module=__name__)
     # если пишут в другой чат, а не боту.
     await query.answer()
@@ -85,6 +93,31 @@ async def get_invitelink(query: CallbackQuery):
                                                               expire_date=timedelta(hours=1))
         await query.message.answer(
             f"Hello, {username}, Analytic ! \nВаша ссылка для входа в канал: {invite_link.invite_link}")
+
+
+async def get_chat_invitelink(query: CallbackQuery):
+    user: User = await user_add_or_update(query, role='analytic', module=__name__)
+    # если пишут в другой чат, а не боту.
+
+    await query.answer()
+    config = query.bot.get('config')
+    db_session = query.bot.get('db')
+    user_id = query.from_user.id
+    firstname = query.from_user.first_name
+    username = query.from_user.username
+    lastname = query.from_user.last_name
+
+    # запущен ли бот в бесплатном режиме.
+    logger = logging.getLogger(__name__)
+
+    if user.is_private_group_member == True:
+        await query.message.answer(
+            f"Здравствуйте! \nВы уже являетесь подписчиком группы.")
+    else:
+        invite_link = await query.bot.create_chat_invite_link(chat_id=config.tg_bot.private_group_id,
+                                                                expire_date=timedelta(hours=1))
+        await query.message.answer(f"Здравствуйте! \nВаша ссылка для входа в приватный чат: {invite_link.invite_link}")
+
 
 
 async def get_predict_list(query: CallbackQuery):
@@ -1046,7 +1079,9 @@ async def publish_comment(message: Message, state: FSMContext):
 def register_analytic(dp: Dispatcher):
     dp.register_callback_query_handler(first_menu, analytic_callback.filter(action='pred'), is_analytic=True, state="*", chat_type="private")
     dp.register_callback_query_handler(make_predict_button, analytic_callback.filter(action='pred_1'), is_analytic=True, state="*", chat_type="private")
-    dp.register_callback_query_handler(get_invitelink, analytic_callback.filter(action='link'),  is_analytic=True, state="*", chat_type="private")
+    dp.register_callback_query_handler(link_menu, analytic_callback.filter(action='link'),  is_analytic=True, state="*", chat_type="private")
+    dp.register_callback_query_handler(get_channel_invitelink, analytic_callback.filter(action='link_channel'), chat_type="private")
+    dp.register_callback_query_handler(get_chat_invitelink, analytic_callback.filter(action='link_chat'), chat_type="private")
     dp.register_callback_query_handler(get_predict_list, analytic_callback.filter(action='pred_2'), is_analytic=True, state="*", chat_type="private")
     dp.register_callback_query_handler(get_predict_list, predict_callback.filter(action="back"), is_analytic=True, state="*", chat_type="private")
     dp.register_callback_query_handler(my_active_predicts,  analytic_callback.filter(action='pred_3'), is_analytic=True, state="*", chat_type="private")

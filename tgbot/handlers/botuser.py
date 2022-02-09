@@ -76,6 +76,13 @@ async def second_menu(query: CallbackQuery):
         text=second_menu_message(),
         reply_markup=second_menu_keyboard())
 
+async def link_menu(query: CallbackQuery):
+    user: User = await user_add_or_update(query, role='user', module=__name__)
+    await query.answer()
+    await query.message.edit_text(
+        text=link_menu_message(),
+        reply_markup=link_menu_keyboard())
+
 
 
 
@@ -532,7 +539,7 @@ async def successful_payment(message: Message):
     print(message.__dict__)
 
 
-async def get_invitelink(query: CallbackQuery):
+async def get_channel_invitelink(query: CallbackQuery):
     user: User = await user_add_or_update(query, role='user', module=__name__)
     # если пишут в другой чат, а не боту.
 
@@ -559,6 +566,36 @@ async def get_invitelink(query: CallbackQuery):
         invite_link = await query.bot.create_chat_invite_link(chat_id=config.tg_bot.channel_id,
                                                                 expire_date=timedelta(hours=1))
         await query.message.answer(f"Здравствуйте! \nВаша ссылка для входа в канал: {invite_link.invite_link}")
+
+
+async def get_chat_invitelink(query: CallbackQuery):
+    user: User = await user_add_or_update(query, role='user', module=__name__)
+    # если пишут в другой чат, а не боту.
+
+    await query.answer()
+    config = query.bot.get('config')
+    db_session = query.bot.get('db')
+    user_id = query.from_user.id
+    firstname = query.from_user.first_name
+    username = query.from_user.username
+    lastname = query.from_user.last_name
+
+    # запущен ли бот в бесплатном режиме.
+    logger = logging.getLogger(__name__)
+
+
+    if user.subscription_until < datetime.utcnow():
+        await query.message.edit_text(
+            f"Здравствуйте! \nВаша подписка истекла. Обновите подписку для получения ссылки на канал.",
+    reply_markup=first_menu_keyboard())
+    elif user.is_private_group_member == True:
+        await query.message.answer(
+            f"Здравствуйте! \nВы уже являетесь подписчиком группы.")
+    else:
+        invite_link = await query.bot.create_chat_invite_link(chat_id=config.tg_bot.private_group_id,
+                                                                expire_date=timedelta(hours=1))
+        await query.message.answer(f"Здравствуйте! \nВаша ссылка для входа в приватный чат: {invite_link.invite_link}")
+
 
 async def user_help(message: Message):
     user: User = await user_add_or_update(message, role='user', module=__name__)
@@ -677,7 +714,9 @@ def register_botuser(dp: Dispatcher):
     dp.register_callback_query_handler(predict_info, user_predict_callback.filter(action="info"), state="*", chat_type="private")
     dp.register_callback_query_handler(list_analytics, user_callback.filter(action='analytic'), state="*", chat_type="private")
     dp.register_callback_query_handler(choose_analytic, user_list_analytic_callback.filter(), state="*", chat_type="private")
-    dp.register_callback_query_handler(get_invitelink, user_callback.filter(action='link'), chat_type="private")
+    dp.register_callback_query_handler(link_menu, user_callback.filter(action='link'), chat_type="private")
+    dp.register_callback_query_handler(get_channel_invitelink, user_callback.filter(action='link_channel'), chat_type="private")
+    dp.register_callback_query_handler(get_chat_invitelink, user_callback.filter(action='link_chat'), chat_type="private")
     dp.register_callback_query_handler(main_menu, user_callback.filter(action='main'), chat_type="private")
     dp.register_callback_query_handler(myinfo, user_callback.filter(action='myinfo'), chat_type="private")
     dp.register_message_handler(menu, commands=["menu"], state="*", chat_type="private")
