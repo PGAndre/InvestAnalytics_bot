@@ -26,8 +26,8 @@ async def kick_users():
         await asyncio.sleep(0.05)
         user_id = user.telegram_id
         try:
-            await bot.unban_chat_member(chat_id=channel_id, user_id=user_id)
-            # await bot.kick_chat_member(chat_id=channel_id, user_id=user_id, until_date=timedelta(seconds=60))
+            # await bot.unban_chat_member(chat_id=channel_id, user_id=user_id)
+            await bot.kick_chat_member(chat_id=channel_id, user_id=user_id, until_date=timedelta(seconds=60))
             # logger.info(f'пользователь {user.__dict__} был исключен из канала в связи с тем, что не был занесен в базу')
         except:
             logger.info(
@@ -59,8 +59,8 @@ async def kick_users_notmember():
         await asyncio.sleep(0.05)
         user_id = user.telegram_id
         try:
-            await bot.unban_chat_member(chat_id=channel_id, user_id=user_id)
-            # await bot.kick_chat_member(chat_id=channel_id, user_id=user_id, until_date=timedelta(seconds=60))
+            # await bot.unban_chat_member(chat_id=channel_id, user_id=user_id)
+            await bot.kick_chat_member(chat_id=channel_id, user_id=user_id, until_date=timedelta(seconds=60))
             # logger.info(f'пользователь {user.__dict__} был исключен из канала в связи с тем, что не был занесен в базу')
         except:
             logger.info(
