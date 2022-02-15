@@ -1,3 +1,4 @@
+import asyncio
 import decimal
 import logging
 import math
@@ -646,9 +647,8 @@ async def publish(message: Message, state: FSMContext):
     logger.info(f'{text}')
     channel_message = await message.bot.send_message(chat_id=channel_id,
                                                      text=text)
-    edited_channel_message = await message.bot.edit_message_text(chat_id=channel_id,
-                                                                 text=text + f'\nСтатус:📈<b>АКТИВЕН</b>',
-                                                                 message_id=channel_message.message_id)
+    await asyncio.sleep(1)
+
     await message.bot.send_message(chat_id=channel_id,
                                    text=f'Пульс ${ticker}',
                                    reply_markup=InlineKeyboardMarkup(inline_keyboard=[
@@ -658,6 +658,10 @@ async def publish(message: Message, state: FSMContext):
                                        ],
                                    ])
                                    )
+    await asyncio.sleep(1)
+    edited_channel_message = await message.bot.edit_message_text(chat_id=channel_id,
+                                                                 text=text + f'\nСтатус:📈<b>АКТИВЕН</b>',
+                                                                 message_id=channel_message.message_id)
     prediction: Prediction = await Prediction.add_predict(db_session=db_session,
                                                           ticker=ticker,
                                                           name=name,
