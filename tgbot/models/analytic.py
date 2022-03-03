@@ -259,11 +259,18 @@ class Prediction(Base):
             return prediction
 
 
-    async def calculate_rating(self, analytic):
+    async def calculate_rating(self, db_session: sessionmaker, analytic):
+        prediction_averaging = await Prediction_averaging.get_averaging_by_predict(db_session=db_session,
+                                                                                   prediction_id=self.id)
+
         logger = logging.getLogger(__name__)
         end_value = self.end_value
         predicted_value = self.predicted_value
         start_value = self.start_value
+
+        if prediction_averaging is not None:
+            start_value = prediction_averaging.averaging_value
+            predicted_value = prediction_averaging.predicted_value
         start_date = self.start_date
         predicted_date = self.predicted_date
         end_date = self.end_date
@@ -360,7 +367,7 @@ class Prediction(Base):
             comments.append(comment)
 
         if not comments:
-            return message_text
+            pass
         else:
             comments.sort(key=lambda r: r.created_date)
             comment_texts=[]
@@ -371,7 +378,19 @@ class Prediction(Base):
                 text = f'\n<b><a href = "{comment.message_url}">{comment_text}</a></b>'
                 message_text=message_text+text
                 comment_texts.append(comment.comment)
-            return message_text
+
+        prediction_averaging = await Prediction_averaging.get_averaging_by_predict(db_session=db_session,
+                                                                                   prediction_id=self.id)
+
+        if prediction_averaging is not None:
+            averaging_value = prediction_averaging.start_value
+            averaging_text_link = f'''Усреднение на {averaging_value} {self.currency}:'''
+            averaging_text = f'''💲Новая цель прогноза: <b>{prediction_averaging.predicted_value} {self.currency}</b>
+⛔Новый СТОП ЛОСС: <b>{prediction_averaging.stop_value} {self.currency}</b>'''
+            # text = f'\n<b><a href = "{comment.message_url}">Коментарий от {comment.created_date:%d-%m-%Y %H:%M}</a></b>'
+            text = f'\n<b><a href = "{prediction_averaging.message_url}">{averaging_text_link}</a></b>\n' + averaging_text
+            message_text = message_text+text
+        return message_text
 
 class Prediction_comment(Base):
     __tablename__ = 'Predicts_comments'
@@ -415,4 +434,54 @@ class Prediction_comment(Base):
         #E = (1 + sign(r) * power((D - d) / (D - 1), 1 / 3) * power(p / P, 1 / 3) * power(min( | r |, p) / p, 1 / 3)) / 2
 
 
+class Prediction_averaging(Base):
+    __tablename__ = 'Predicts_averaging'
 
+    id = Column(Integer, primary_key=True, autoincrement="auto")
+    prediction_id = Column(BigInteger, ForeignKey(Prediction.id, ondelete="CASCADE"), nullable=False)
+    predicted_date = Column(DateTime, nullable=False)
+    start_value = Column(Numeric(12, 2))
+    averaging_value = Column(Numeric(12, 2), nullable=False)
+    predicted_value = Column(Numeric(12, 2), nullable=False)
+    stop_value = Column(Numeric(12, 2), nullable=True)
+    message_id = Column(BigInteger, nullable=True)
+    message_url = Column(String(100), nullable=True)
+    created_date = Column(DateTime, default=datetime.datetime.utcnow)
+    updated_date = Column(DateTime(timezone=True), onupdate=func.now())
+
+    @classmethod
+    async def get_averaging_by_predict(cls,
+                          db_session: sessionmaker,
+                          prediction_id: BigInteger ):
+        async with db_session() as db_session:
+            sql = select(cls).where(cls.prediction_id == prediction_id)
+            request = await db_session.execute(sql)
+            predict_averaging: cls = request.scalar()
+            return predict_averaging
+
+    @classmethod
+    async def add_prediction_averaging(cls,
+                                  db_session: sessionmaker,
+                                  prediction_id: BigInteger,
+                                  predicted_date: datetime,
+                                  averaging_value: Numeric,
+                                  start_value: Numeric,
+                                  predicted_value: Numeric,
+                                  stop_value: Numeric,
+                                  message_id: BigInteger,
+                                  message_url: str
+                                  ) -> 'Prediction_averaging':
+        prediction_averaging: Prediction_averaging = Prediction_averaging(prediction_id = prediction_id,
+                                                            predicted_date = predicted_date,
+                                                            averaging_value = averaging_value,
+                                                            start_value = start_value,
+                                                            predicted_value = predicted_value,
+                                                            stop_value = stop_value,
+                                                            message_id = message_id,
+                                                            message_url = message_url
+
+        )
+        async with db_session() as db_session:
+            db_session.add(prediction_averaging)
+            await db_session.commit()
+            return prediction_averaging
