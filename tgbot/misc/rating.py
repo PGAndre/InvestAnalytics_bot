@@ -295,12 +295,14 @@ async def predictions_active_finished():
 # noinspection PyTypeChecker
 async def prediction_candle_analys(prediction: Prediction, prediction_averaging: Prediction_averaging, config: Config):
     #задаём переменные predictions:
+    start_date = prediction.start_date
     start_value = prediction.start_value
     predicted_value = prediction.predicted_value
     predicted_date = prediction.predicted_date
     stop_value = prediction.stop_value
 
     if prediction_averaging is not None:
+        start_date = prediction_averaging.created_date
         start_value = prediction_averaging.averaging_value
         predicted_value = prediction_averaging.predicted_value
         predicted_date = prediction_averaging.predicted_date
@@ -318,7 +320,7 @@ async def prediction_candle_analys(prediction: Prediction, prediction_averaging:
     #     autostop_value = round(prediction.start_value*decimal.Decimal(1 + autostop_percentage/100),2)
     #print(prediction.start_date.date() + timedelta(days=2))
     #print(datetime.now().date())
-    if prediction.start_date.date() + timedelta(days=2) <= datetime.now().date():
+    if start_date.date() + timedelta(days=2) <= datetime.now().date():
         #print('больше двух дней')
 
         #print(prediction.start_date + timedelta(hours=2))
@@ -333,22 +335,22 @@ async def prediction_candle_analys(prediction: Prediction, prediction_averaging:
         candles_lasthour = [x for x in candles_lasthour if x.time.replace(tzinfo=None) <= datetime.now()]
         candles_lasthour = [x for x in candles_lasthour if x.time.replace(tzinfo=None) <= predicted_date]
         candles_firsthour = (
-            await get_candles_inrange(figi=prediction.figi, from_=prediction.start_date + timedelta(hours=-1),
-                                      to=(prediction.start_date + timedelta(hours=1)).replace(minute=59, second=0),
+            await get_candles_inrange(figi=prediction.figi, from_=start_date + timedelta(hours=-1),
+                                      to=(start_date + timedelta(hours=1)).replace(minute=59, second=0),
                                       interval='minute',
                                       config=config)).candles
 
-        candles_firsthour = [x for x in candles_firsthour if x.time.replace(tzinfo=None) >= prediction.start_date]
+        candles_firsthour = [x for x in candles_firsthour if x.time.replace(tzinfo=None) >= start_date]
 
         candles_hourly = (
-            await get_candles_inrange(figi=prediction.figi, from_=prediction.start_date + timedelta(hours=1),
-                                      to=prediction.start_date + timedelta(days=2),
+            await get_candles_inrange(figi=prediction.figi, from_=start_date + timedelta(hours=1),
+                                      to=start_date + timedelta(days=2),
                                       interval='hour',
                                       config=config)).candles
 
         candles_dayly = (
             await get_candles_inrange(figi=prediction.figi,
-                                      from_=(prediction.start_date + timedelta(days=1)).replace(hour=23),
+                                      from_=(start_date + timedelta(days=1)).replace(hour=23),
                                       to=datetime.now(),
                                       interval='day',
                                       config=config)).candles
@@ -432,7 +434,7 @@ async def prediction_candle_analys(prediction: Prediction, prediction_averaging:
         return predictionAnalys
 
 
-    elif prediction.start_date + timedelta(hours=2) <= datetime.utcnow():
+    elif start_date + timedelta(hours=2) <= datetime.utcnow():
         #print(f'от двух часов')
         #print(prediction.start_date + timedelta(hours=2))
         #print(datetime.utcnow())
@@ -440,12 +442,12 @@ async def prediction_candle_analys(prediction: Prediction, prediction_averaging:
         # print(to_time)
         #print(isLong)
         candles_firsthour = (
-            await get_candles_inrange(figi=prediction.figi, from_=prediction.start_date + timedelta(hours=-1),
-                                      to=(prediction.start_date + timedelta(hours=1)).replace(minute=59, second=0),
+            await get_candles_inrange(figi=prediction.figi, from_=start_date + timedelta(hours=-1),
+                                      to=(start_date + timedelta(hours=1)).replace(minute=59, second=0),
                                       interval='minute',
                                       config=config)).candles
 
-        candles_firsthour = [x for x in candles_firsthour if x.time.replace(tzinfo=None) >= prediction.start_date]
+        candles_firsthour = [x for x in candles_firsthour if x.time.replace(tzinfo=None) >= start_date]
 
         candles_lasthour = (
             await get_candles_inrange(figi=prediction.figi, from_=datetime.utcnow() + timedelta(hours=-2),
@@ -458,7 +460,7 @@ async def prediction_candle_analys(prediction: Prediction, prediction_averaging:
 
 
         candles_hourly = (
-            await get_candles_inrange(figi=prediction.figi, from_=prediction.start_date, to=datetime.utcnow(),
+            await get_candles_inrange(figi=prediction.figi, from_=start_date, to=datetime.utcnow(),
                                       interval='hour',
                                       config=config)).candles
         #print(f'почасовые№№№№№№№№№№№№№№№№№№№№№№№№№№№№№№№№№№№№№№№№№№№№№№№№№')
@@ -542,11 +544,11 @@ async def prediction_candle_analys(prediction: Prediction, prediction_averaging:
 
     else:
         #print('меньше двух часов')
-        to_time = (prediction.start_date + timedelta(hours=1)).replace(minute=59, second=0)
+        to_time = (start_date + timedelta(hours=1)).replace(minute=59, second=0)
         #print(to_time)
         #print(isLong)
         candles_firsthour = (
-            await get_candles_inrange(figi=prediction.figi, from_=prediction.start_date + timedelta(hours=-2),
+            await get_candles_inrange(figi=prediction.figi, from_=start_date + timedelta(hours=-2),
                                       to=datetime.utcnow(), interval='minute',
                                       config=config)).candles
         # if not candles_firsthour:
@@ -555,7 +557,7 @@ async def prediction_candle_analys(prediction: Prediction, prediction_averaging:
 
         #print(f'dfgkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkk')
 
-        candles_firsthour = [x for x in candles_firsthour if x.time.replace(tzinfo=None) >= prediction.start_date]
+        candles_firsthour = [x for x in candles_firsthour if x.time.replace(tzinfo=None) >= start_date]
         candles_firsthour = [x for x in candles_firsthour if x.time.replace(tzinfo=None) <= predicted_date]
 
         all_candles = candles_firsthour
