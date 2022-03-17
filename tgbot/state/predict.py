@@ -22,4 +22,9 @@ class Predict_comment(StatesGroup):
     Confirm = State()
     Publish_Comment = State()
 
+class Predict_average(StatesGroup):
+    Set_Target = State()
+    Set_Stop = State()
+    Publish_average = State()
+
 
