@@ -1,3 +1,4 @@
+import asyncio
 import decimal
 import logging
 import math
@@ -14,10 +15,10 @@ from tgbot.keyboards.analytic_menu import *
 from tgbot.keyboards.callback_datas import predict_callback, list_my_predicts_callback, user_list_analytic_callback
 from tgbot.misc.misc import user_add_or_update, num_after_point
 
-from tgbot.models.analytic import Prediction, Analytic, Prediction_comment
+from tgbot.models.analytic import Prediction, Analytic, Prediction_comment, Prediction_averaging
 from tgbot.keyboards import reply
 from tgbot.models.users import User
-from tgbot.state.predict import Predict, Predict_comment
+from tgbot.state.predict import Predict, Predict_comment, Predict_average
 from tgbot.misc import tinkoff, bdays
 
 
@@ -473,7 +474,7 @@ async def set_target(message: Message, state: FSMContext):
         stop_12 = round(start_value * (1 - 12 / 100), nums_after_point)
         stop_15 = round(start_value * (1 - 15 / 100), nums_after_point)
     await message.answer(
-        f'Введите уровень <b>СТОП ЛОСС</b> для ${ticker}(от 1.5% до 15%) \nОриентировочные значения:\n<b>1.5%</b> - {stop_1_5} \n<b>3%</b> - {stop_3} \n<b>6%</b> - {stop_6} \n<b>9%</b> - {stop_9} \n<b>12%</b> - {stop_12} \n<b>15%</b> - {stop_15} \nесли вы укажите <b>0</>, то уровень СТОП ЛОСС автоматически будет равено  <b>-15%</b>',
+        f'Введите уровень <b>СТОП ЛОСС</b> для ${ticker}(от 1.5% до 15%) \nОриентировочные значения:\n<b>1.5%</b> - {stop_1_5} \n<b>3%</b> - {stop_3} \n<b>6%</b> - {stop_6} \n<b>9%</b> - {stop_9} \n<b>12%</b> - {stop_12} \n<b>15%</b> - {stop_15} \nесли вы укажите <b>0</>, то уровень СТОП ЛОСС автоматически будет равен <b>-15%</b>',
         reply_markup=reply.cancel_back_markup)
     await Predict.Set_Stop.set()
     ### await message.answer(f'Введите уровень риска к прогнозу ${ticker}(по желанию)\n<b>1</b> - низкий уровень риска \n<b>2</b> - средний уровень риска \n<b>3</b> - высокий уровень риска \n', reply_markup=reply.cancel_back_markup)
@@ -679,9 +680,8 @@ async def publish(message: Message, state: FSMContext):
     logger.info(f'{text}')
     channel_message = await message.bot.send_message(chat_id=channel_id,
                                                      text=text)
-    edited_channel_message = await message.bot.edit_message_text(chat_id=channel_id,
-                                                                 text=text + f'\nСтатус:📈<b>АКТИВЕН</b>',
-                                                                 message_id=channel_message.message_id)
+    await asyncio.sleep(1)
+
     await message.bot.send_message(chat_id=channel_id,
                                    text=f'Пульс ${ticker}',
                                    reply_markup=InlineKeyboardMarkup(inline_keyboard=[
@@ -691,6 +691,10 @@ async def publish(message: Message, state: FSMContext):
                                        ],
                                    ])
                                    )
+    await asyncio.sleep(1)
+    edited_channel_message = await message.bot.edit_message_text(chat_id=channel_id,
+                                                                 text=text + f'\nСтатус:📈<b>АКТИВЕН</b>',
+                                                                 message_id=channel_message.message_id)
     prediction: Prediction = await Prediction.add_predict(db_session=db_session,
                                                           ticker=ticker,
                                                           name=name,
@@ -800,6 +804,9 @@ async def choose_action_my_predict(query: CallbackQuery, callback_data: dict):
     markup.insert(InlineKeyboardButton(text=f'📝Добавить коментарий в прогноз ${ticker}',
                                        callback_data=list_my_predicts_callback.new(ticker=ticker,
                                                                                    action='add_comment')))
+    markup.insert(InlineKeyboardButton(text=f'🗑Усреднить прогноз ${ticker}',
+                                       callback_data=list_my_predicts_callback.new(ticker=ticker,
+                                                                                   action='add_average')))
     markup.row(InlineKeyboardButton(text='К списку моих прогнозов',
                                     callback_data=list_my_predicts_callback.new(ticker=ticker, action='back_to_my')))
     markup.row(
@@ -863,7 +870,7 @@ async def delete_my_predict(query: CallbackQuery, callback_data: dict):
                                                                    ticker=ticker,
                                                                    analytic_id=analytic_id)
 
-    prediction_rating = await updated_predict.calculate_rating(analytic)
+    prediction_rating = await updated_predict.calculate_rating(db_session, analytic)
     try:
         if analytic.bonuscount > 0:
             bonuscount = analytic.bonuscount - 1
@@ -919,6 +926,16 @@ async def delete_my_predict(query: CallbackQuery, callback_data: dict):
         await query.message.edit_text(text=text, reply_markup=markup)
         await query.message.bot.send_message(chat_id=channel_id,
                                              text=text_tochannel)
+        await asyncio.sleep(1)
+        await query.bot.send_message(chat_id=channel_id,
+                               text=f'Пульс ${updated_prediction.ticker}',
+                               reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+                                   [
+                                       InlineKeyboardButton(text=f"Open in Tinkoff",
+                                                            url=f'https://www.tinkoff.ru/invest/stocks/{updated_prediction.ticker}')
+                                   ],
+                               ])
+                               )
     else:
         # new_text = new_text.replace("&lt;", "<").replace("&gt;", ">")
         text_tochannel = f'''🚫🚫🚫Прогноз по акции <b><a href="{message_url}">${updated_prediction.ticker}</a></b> БЫЛ ОТМЕНЕН!!! . 
@@ -938,6 +955,17 @@ async def delete_my_predict(query: CallbackQuery, callback_data: dict):
         await query.message.edit_text(text=text, reply_markup=markup)
 
         channel_message = await query.message.bot.send_message(chat_id=channel_id, text=text_tochannel)
+        await asyncio.sleep(1)
+        await query.bot.send_message(chat_id=channel_id,
+                               text=f'Пульс ${updated_prediction.ticker}',
+                               reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+                                   [
+                                       InlineKeyboardButton(text=f"Open in Tinkoff",
+                                                            url=f'https://www.tinkoff.ru/invest/stocks/{updated_prediction.ticker}')
+                                   ],
+                               ])
+                               )
+        await asyncio.sleep(1)
         await query.message.bot.edit_message_text(
             text=new_text + f'\nСтатус: <b>🚫<a href="{channel_message.url}">ОТМЕНЕН</a></b>', chat_id=channel_id,
             message_id=message_id)
@@ -1001,8 +1029,14 @@ async def add_comment_my_predict(query: CallbackQuery, callback_data: dict):
         print(comments)
     comments_avaliable = max_comments - comment_count
     if comments_avaliable <= 0:
-        await query.message.answer(f'К прогнозу нельзя добавить больше {max_comments}х коментариев',
-                                   reply_markup=ReplyKeyboardRemove())
+        markup = InlineKeyboardMarkup(row_width=1)
+        markup.row(InlineKeyboardButton(text='К списку моих прогнозов',
+                                        callback_data=list_my_predicts_callback.new(ticker=ticker,
+                                                                                    action='back_to_my')))
+
+        await query.message.edit_text(text=f'К прогнозу нельзя добавить больше {max_comments}х коментариев', reply_markup=markup)
+        # await query.message.answer(f'К прогнозу нельзя добавить больше {max_comments}х коментариев',
+        #                            reply_markup=ReplyKeyboardRemove())
         await state.finish()
         return
     start = f'{prediction.start_date.date():%d-%m-%Y}'
@@ -1054,6 +1088,7 @@ async def publish_comment(message: Message, state: FSMContext):
         comment = data['comment']
         message_id = data['message_id']
         message_text = data['message_text']
+        ticker = data['ticker']
         await state.finish()
     channel_id = config.tg_bot.channel_id
     await message.answer(text=text_tochannel,
@@ -1074,6 +1109,275 @@ async def publish_comment(message: Message, state: FSMContext):
     # new_text = message_text + f'\nДобавлен коментарий:'
     await message.bot.edit_message_text(text=new_text + f'\nСтатус:📈<b>АКТИВЕН</b>',
                                         chat_id=channel_id, message_id=message_id)
+    markup = InlineKeyboardMarkup(row_width=1)
+    markup.row(InlineKeyboardButton(text='К списку моих прогнозов',
+                                    callback_data=list_my_predicts_callback.new(ticker=ticker,
+                                                                                action='back_to_my')))
+
+    await message.answer(text=f'Коментарий к прогнозу ${ticker} добавлен',
+                                  reply_markup=markup)
+
+
+async def add_average_my_predict(query: CallbackQuery, callback_data: dict):
+    user: User = await user_add_or_update(query, role='analytic', module=__name__)
+    await query.answer()
+    state = Dispatcher.get_current().current_state()
+    config = query.bot.get('config')
+    db_session = query.bot.get('db')
+    analytic_id = query.from_user.id
+
+
+    ticker = callback_data.get('ticker')
+    prediction = await Prediction.get_predict_analytic_ticker(db_session=db_session,
+                                                              ticker=ticker,
+                                                              analytic_id=analytic_id)
+    prediction_averaging = await Prediction_averaging.get_averaging_by_predict(db_session=db_session,
+                                                                               prediction_id=prediction.id)
+
+    if prediction_averaging is not None:
+        markup = InlineKeyboardMarkup(row_width=1)
+        markup.row(InlineKeyboardButton(text='К списку моих прогнозов',
+                                        callback_data=list_my_predicts_callback.new(ticker=ticker,
+                                                                                    action='back_to_my')))
+
+        await query.message.edit_text(text=f'Для данного прогноза уже есть усреднение <b>${ticker}</b>. Усреднять нельзя',
+                             reply_markup=markup)
+        await state.finish()
+        return
+
+    instrument = await tinkoff.search_by_ticker(ticker, config)
+    latestcost = float(await tinkoff.latestcost(figi=instrument['figi'], config=config))
+    predicted_value = float(prediction.predicted_value)
+    start_value = float(prediction.start_value)
+    start_date = prediction.start_date
+    predicted_date = prediction.predicted_date
+    currency = prediction.currency
+    analytic_nickname = prediction.analytic.Nickname
+    prediction_url = prediction.message_url
+    message_id = prediction.message_id
+    predict_sign = math.copysign(1, (predicted_value - start_value))
+    real_profit = predict_sign*(latestcost - start_value)
+    prediction_id = prediction.id
+
+
+    if real_profit >= 0:
+        markup = InlineKeyboardMarkup(row_width=1)
+        markup.row(InlineKeyboardButton(text='К списку моих прогнозов',
+                                        callback_data=list_my_predicts_callback.new(ticker=ticker,
+                                                                                    action='back_to_my')))
+
+        await query.message.edit_text(text=f'В данный момент профит по прогнозу <b>${ticker}</b> положительный. Усреднять нельзя',
+                             reply_markup=markup)
+        await state.finish()
+        return
+
+    nums_after_point = await num_after_point(start_value)
+    averaging_value = round(float((latestcost + start_value)/2),nums_after_point)
+    min_profit = 3
+    max_profit = 30
+    if predict_sign > 0:
+        min_target = averaging_value*(min_profit/100 + 1)
+        min_target = round(2*(min_target+1/pow(10,nums_after_point))/2,nums_after_point)
+        max_target = averaging_value*(max_profit/100 + 1)
+        max_target = round(2*(max_target-1/pow(10,nums_after_point))/2,nums_after_point)
+    if predict_sign < 0:
+        min_target = averaging_value*(1 - max_profit/100)
+        min_target = round(2*(min_target+1/pow(10,nums_after_point))/2, nums_after_point)
+        max_target = averaging_value*(1 - min_profit/100)
+        max_target = round(2*(max_target-1/pow(10,nums_after_point))/2, nums_after_point)
+
+    start = f'{start_date.date():%d-%m-%Y}'
+    predicted_date = f'{predicted_date}'
+    async with state.proxy() as data:
+        data['predict_sign'] = predict_sign
+        data['ticker'] = ticker
+        data['analytic_id'] = analytic_id
+        data['averaging_value'] = averaging_value
+        data['min_target'] = min_target
+        data['max_target'] = max_target
+        data['start_value'] = start_value
+        data['currency'] = currency
+        data['predicted_value']= predicted_value
+        data['latestcost'] = latestcost
+        data['analytic_nickname'] = analytic_nickname
+        data['prediction_url'] = prediction_url
+        data['start_date'] = start
+        data['predicted_date'] = predicted_date
+        data['message_id'] = message_id
+        data['prediction_id'] = prediction_id
+    await query.message.answer(f'Введите новую цель прогноза <b>${ticker}</b>\nНачальный прогноз: <b>{start_value} {currency}</b>➡<b>{predicted_value} {currency}</b>\nЦена сейчас: <b>{latestcost} {currency}</b>\nЦена усреднения: <b>{averaging_value} {currency}</b>\nМинимальная новая цель прогноза: <b>{min_target} {currency}</b>\nМаксимальная новая цель: <b>{max_target} {currency}</b>', reply_markup=reply.cancel)
+    await Predict_average.Set_Target.set()
+
+
+async def add_average_my_predict_message(message: Message, state: FSMContext):
+    async with state.proxy() as data:
+        ticker = data['ticker']
+        averaging_value = data['averaging_value']
+        min_target = data['min_target']
+        max_target = data['max_target']
+        start_value = data['start_value']
+        currency = data['currency']
+        predicted_value = data['predicted_value']
+        latestcost = data['latestcost']
+    await message.answer(f'Введите новую цель прогноза <b>${ticker}</b>\nНачальный прогноз: <b>{start_value} {currency}</b>➡<b>{predicted_value} {currency}</b>\nЦена сейчас: <b>{latestcost} {currency}</b>\nЦена усреднения: <b>{averaging_value} {currency}</b>\nМинимальная новая цель прогноза: <b>{min_target} {currency}</b>\nМаксимальная новая цель: <b>{max_target} {currency}</b>', reply_markup=reply.cancel_back_markup)
+    await Predict_average.Set_Target.set()
+
+
+async def set_target_averaging(message: Message, state: FSMContext):
+    config = message.bot.get('config')
+
+    try:
+        target = float(message.text)
+    except ValueError:
+        await message.answer('Вы ввели некорректную цель')
+        await add_average_my_predict_message(message, state)
+
+        return
+
+    async with state.proxy() as data:
+        ticker = data['ticker']
+        averaging_value = data['averaging_value']
+        min_target = data['min_target']
+        max_target = data['max_target']
+        currency = data['currency']
+        predict_sign = data['predict_sign']
+        start_value = data['start_value']
+        latestcost = data['latestcost']
+
+    if target < min_target or target > max_target:
+        await message.answer(f'Вы ввели неверную цель. Новая цело должна быть в диапазоне:\n<b>{min_target} {currency}</b>➡<b>{max_target} {currency}</b>')
+        await add_average_my_predict_message(message, state)
+        return
+
+    async with state.proxy() as data:
+        data['target'] = target
+
+    nums_after_point = await num_after_point(start_value)
+    if predict_sign==-1:
+        min_stop = round(latestcost*(1+1.5/100), nums_after_point)
+        max_stop = round(averaging_value * (1 + 15 / 100), nums_after_point)
+    else:
+        max_stop = round(latestcost * (1 - 1.5 / 100), nums_after_point)
+        min_stop = round(averaging_value * (1 - 15 / 100), nums_after_point)
+
+    async with state.proxy() as data:
+        data['min_stop'] = min_stop
+        data['max_stop'] = max_stop
+
+    await message.answer(f'Введите новый СТОП ЛОСС прогноза <b>${ticker}</b>\nНовый СТОП ЛОСС должен быть в диапазоне:\n<b>{min_stop} {currency}</b>➡<b>{max_stop} {currency}</b>', reply_markup=reply.cancel_back_markup)
+    await Predict_average.Set_Stop.set()
+
+
+async def set_stop_averaging(message: Message, state: FSMContext):
+    config = message.bot.get('config')
+
+
+    async with state.proxy() as data:
+        min_stop = data['min_stop']
+        max_stop = data['max_stop']
+        currency = data['currency']
+        target = data['target']
+        analytic_nickname = data['analytic_nickname']
+        prediction_url = data['prediction_url']
+        ticker = data['ticker']
+        start_date = data['start_date']
+        latestcost = data['latestcost']
+        averaging_value = data['averaging_value']
+
+    try:
+        stop_value = float(message.text)
+    except ValueError:
+        await message.answer('Вы ввели некорректный СТОП')
+        message.text = target
+        await set_target_averaging(message, state)
+        return
+
+    if stop_value < min_stop or stop_value > max_stop:
+        await message.answer(f'Вы ввели неверный СТОП. Новый СТОП должен быть в диапазоне:\n<b>{min_stop} {currency}</b>➡<b>{max_stop} {currency}</b>')
+        message.text  = target
+        await set_target_averaging(message, state)
+        return
+
+    async with state.proxy() as data:
+        data['stop_value'] = stop_value
+
+    text = f'''Аналитик <b>{analytic_nickname}</b> добавил Усреднение к прогнозу по акции \n🏦<b><a href="{prediction_url}">${ticker}</a></b> от <b>{start_date}</b>   :
+Цена акции сейчас: <b>{latestcost} {currency}</b>
+Цена усреднённая: <b>{averaging_value} {currency}</b>
+Новая цель прогноза: <b>{target} {currency}</b>
+Новый СТОП ЛОСС: <b>{stop_value} {currency}</b>
+'''
+
+    await message.answer(text=f'<b>Текст опубликованного сообщения будет:</b>\n' + text,
+                         reply_markup=reply.confirm)
+    async with state.proxy() as data:
+        data['text'] = text
+    await Predict_average.Publish_average.set()
+
+
+async def publish_averaging(message: Message, state: FSMContext):
+    config = message.bot.get('config')
+    async with state.proxy() as data:
+        text_tochannel = data['text']
+        analytic_nickname = data['analytic_nickname']
+        prediction_id = data['prediction_id']
+        message_id = data['message_id']
+        ticker = data['ticker']
+        predicted_date = data['predicted_date']
+        averaging_value = data['averaging_value']
+        latestcost = data['latestcost']
+        target = data['target']
+        stop_value = data['stop_value']
+
+    predicted_date = datetime.strptime(predicted_date, '%Y-%m-%d %H:%M:%S.%f')
+    await state.finish()
+    channel_id = config.tg_bot.channel_id
+    await message.answer(text=text_tochannel,
+                         reply_markup=ReplyKeyboardRemove())
+    channel_message = await message.bot.send_message(chat_id=channel_id,
+                                                     text=text_tochannel)
+    db_session = message.bot.get('db')
+    prediction_averaging = await Prediction_averaging.add_prediction_averaging(db_session=db_session,
+                                                                             prediction_id=prediction_id,
+                                                                             predicted_date=predicted_date,
+                                                                             averaging_value = averaging_value,
+                                                                             start_value=latestcost,
+                                                                             predicted_value=target,
+                                                                             stop_value=stop_value,
+                                                                             message_id=channel_message.message_id,
+                                                                             message_url=channel_message.url
+                                                                         )
+
+    prediction: Prediction = await Prediction.get_predict_by_id(db_session=db_session, id=prediction_id)
+    new_text = await prediction.edit_message_text(db_session=db_session)
+
+    # new_text = message_text + f'\nДобавлен коментарий:'
+    await message.bot.edit_message_text(text=new_text + f'\nСтатус:📈<b>АКТИВЕН</b>',
+                                        chat_id=channel_id, message_id=message_id)
+    markup = InlineKeyboardMarkup(row_width=1)
+    markup.row(InlineKeyboardButton(text='К списку моих прогнозов',
+                                    callback_data=list_my_predicts_callback.new(ticker=ticker,
+                                                                                action='back_to_my')))
+
+    await message.answer(text=f'Усреднение к прогнозу ${ticker} добавлено',
+                                  reply_markup=markup)
+
+
+async def cancel_averaging(message: Message, state: FSMContext):
+    await message.answer('Выход из усреднения', reply_markup=ReplyKeyboardRemove())
+    await state.finish()
+
+
+async def back_to_averaging(message: Message, state: FSMContext):
+    current_state = await state.get_state()
+    if current_state == 'Predict_average:Set_Stop':
+        await message.answer('Возврат к вводу новой цели', reply_markup=ReplyKeyboardRemove())
+        await add_average_my_predict_message(message, state)
+    if current_state == 'Predict_average:Publish_average':
+        await message.answer('Возврат к вводу нового СТОП ЛОССа', reply_markup=ReplyKeyboardRemove())
+        async with state.proxy() as data:
+            message.text = data['target']
+        await set_target_averaging(message, state)
 
 
 def register_analytic(dp: Dispatcher):
@@ -1092,6 +1396,8 @@ def register_analytic(dp: Dispatcher):
     dp.register_message_handler(cancel_comment, text="отменить",
                                 state=[Predict_comment.Set_Comment, Predict_comment.Confirm, Predict_comment.Publish_Comment])
     dp.register_callback_query_handler(add_comment_my_predict, list_my_predicts_callback.filter(action='add_comment'), is_analytic=True, state="*", chat_type="private")
+    dp.register_callback_query_handler(add_average_my_predict, list_my_predicts_callback.filter(action='add_average'),
+                                       is_analytic=True, state="*", chat_type="private")
     dp.register_message_handler(set_comment_my_predict, state=Predict_comment.Confirm, chat_type="private")
     dp.register_message_handler(publish_comment, text="опубликовать", state=Predict_comment.Publish_Comment, chat_type="private")
     dp.register_callback_query_handler(delete_my_predict, list_my_predicts_callback.filter(action='delete'), is_analytic=True, state="*", chat_type="private")
@@ -1113,3 +1419,11 @@ def register_analytic(dp: Dispatcher):
     dp.register_message_handler(set_risk, state=Predict.Set_Risk)
     dp.register_message_handler(confirm, state=Predict.Confirm)
     dp.register_message_handler(publish, text="опубликовать", state=Predict.Publish)
+    dp.register_message_handler(back_to_averaging, text="назад",
+                                state=[Predict_average.Set_Target, Predict_average.Set_Stop, Predict_average.Publish_average])
+    dp.register_message_handler(cancel_averaging, text="отменить",
+                                state=[Predict_average.Set_Target, Predict_average.Set_Stop, Predict_average.Publish_average])
+    dp.register_message_handler(set_target_averaging, state=Predict_average.Set_Target, chat_type="private")
+    dp.register_message_handler(set_stop_averaging, state=Predict_average.Set_Stop, chat_type="private")
+    dp.register_message_handler(publish_averaging, text="опубликовать", state=Predict_average.Publish_average, chat_type="private")
+

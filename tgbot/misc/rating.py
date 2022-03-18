@@ -14,7 +14,7 @@ from tinvest import Candle
 
 from tgbot.config import load_config, Config
 from tgbot.misc.tinkoff import get_candles_inrange
-from tgbot.models.analytic import Analytic, Prediction
+from tgbot.models.analytic import Analytic, Prediction, Prediction_averaging
 from tgbot.services.database import create_db_session
 from tgbot.misc import tinkoff
 
@@ -59,10 +59,14 @@ async def predictions_active():
     predictions: list[Prediction] = await Prediction.get_active_predicts(db_session=db_session)
     for prediction in predictions:
         #print(f' предикт: прогнозируемое значение: {prediction.predicted_value}. {prediction}, {prediction.__dict__}')
-        to_date = prediction.start_date
-        isLong = math.copysign(1, (prediction.predicted_value - prediction.start_value))
+        # to_date = prediction.start_date
+        # isLong = math.copysign(1, (prediction.predicted_value - prediction.start_value))
         #print(to_date)
-        predictionanalysis: PredictionAnalys = await prediction_candle_analys(prediction, config)
+        prediction_averaging = await Prediction_averaging.get_averaging_by_predict(db_session=db_session,
+                                                                                   prediction_id=prediction.id)
+
+
+        predictionanalysis: PredictionAnalys = await prediction_candle_analys(prediction, prediction_averaging, config)
 
         if not predictionanalysis:
             continue
@@ -70,10 +74,12 @@ async def predictions_active():
         if prediction.predicted_date <= datetime.now():
             # если предикт всё таки сбылся (индекс 0 или отрицательный)
             if predictionanalysis.prediction_index <= 0:
+                end_value = prediction.predicted_value
+                if prediction_averaging is not None:
+                    end_value = prediction_averaging.predicted_value
                 # записываем дату первой "пробивной" свечи, в которойпредикт сбылся
                 end_date = predictionanalysis.first_candle_morethen_predicted.time.replace(tzinfo=None)
                 # конечное значение равно предсказанному
-                end_value = prediction.predicted_value
                 successful = True
                 await Prediction.update_predict(db_session,
                                                 successful=successful,
@@ -104,9 +110,11 @@ async def predictions_active():
 
         else:  # если скро предикта еще не истек
             if predictionanalysis.prediction_index <= 0:
+                end_value = prediction.predicted_value
+                if prediction_averaging is not None:
+                    end_value = prediction_averaging.predicted_value
                 end_date = predictionanalysis.first_candle_morethen_predicted.time.replace(tzinfo=None)
                 #print(f'прогноз сбылся раньше времени{type(end_date)}')
-                end_value = prediction.predicted_value
                 successful = True
                 await Prediction.update_predict(db_session,
                                                 successful=successful,
@@ -117,9 +125,11 @@ async def predictions_active():
 
             else:
                 if predictionanalysis.stop_index >= 0:
+                    end_value = prediction.stop_value
+                    if prediction_averaging is not None:
+                        end_value = prediction_averaging.stop_value
                     end_date = predictionanalysis.first_candle_lessthen_stop.time.replace(tzinfo=None)
                     # print(f'прогноз сбылся раньше времени{type(end_date)}')
-                    end_value = prediction.stop_value
                     successful = False
                     stopped = True
                     await Prediction.update_predict(db_session,
@@ -175,7 +185,7 @@ async def predictions_active_finished():
        #print(f' предикт: прогнозируемое значение: {prediction.analytic.__dict__}, {prediction}, {prediction.__dict__}')
         analytic_id = prediction.analytic_id
         analytic = await Analytic.get_analytic_by_id(db_session=db_session, telegram_id=prediction.analytic_id)
-        prediction_rating = await prediction.calculate_rating(analytic)
+        prediction_rating = await prediction.calculate_rating(db_session, analytic)
         try:
             if analytic.bonuscount>0:
                 bonuscount=analytic.bonuscount-1
@@ -221,7 +231,7 @@ async def predictions_active_finished():
 
             await bot.send_message(chat_id=channel_id,
                                    text=text)
-
+            await asyncio.sleep(1)
             await bot.send_message(chat_id=channel_id,
                                    text=f'Пульс ${updated_prediction.ticker}',
                                    reply_markup=InlineKeyboardMarkup(inline_keyboard=[
@@ -257,7 +267,7 @@ async def predictions_active_finished():
 
             channel_message = await bot.send_message(chat_id=channel_id,
                                    text=text_tochannel)
-
+            await asyncio.sleep(1)
             await bot.send_message(chat_id=channel_id,
                                    text=f'Пульс ${updated_prediction.ticker}',
                                    reply_markup=InlineKeyboardMarkup(inline_keyboard=[
@@ -267,7 +277,7 @@ async def predictions_active_finished():
                                        ],
                                    ])
                                    )
-
+            await asyncio.sleep(1)
             new_text = await updated_prediction.edit_message_text(db_session=db_session)
             if prediction.successful:
                 await bot.edit_message_text(text=new_text + f'\nСтатус: 🚀<b><a href="{channel_message.url}">ЗАВЕРШЕН</a></b>',
@@ -283,9 +293,24 @@ async def predictions_active_finished():
 
 
 # noinspection PyTypeChecker
-async def prediction_candle_analys(prediction: Prediction, config: Config):
-    isLong = math.copysign(1, (prediction.predicted_value - prediction.start_value))
-    predict_sign = decimal.Decimal(math.copysign(1, (prediction.predicted_value - prediction.start_value)))
+async def prediction_candle_analys(prediction: Prediction, prediction_averaging: Prediction_averaging, config: Config):
+    #задаём переменные predictions:
+    start_date = prediction.start_date
+    start_value = prediction.start_value
+    predicted_value = prediction.predicted_value
+    predicted_date = prediction.predicted_date
+    stop_value = prediction.stop_value
+
+    if prediction_averaging is not None:
+        start_date = prediction_averaging.created_date
+        start_value = prediction_averaging.averaging_value
+        predicted_value = prediction_averaging.predicted_value
+        predicted_date = prediction_averaging.predicted_date
+        stop_value = prediction_averaging.stop_value
+
+
+    isLong = math.copysign(1, (predicted_value - start_value))
+    predict_sign = decimal.Decimal(math.copysign(1, (predicted_value - start_value)))
     # #процент АВТОСТОПА
     # autostop_percentage = 15
     # # значение автостопа
@@ -295,7 +320,7 @@ async def prediction_candle_analys(prediction: Prediction, config: Config):
     #     autostop_value = round(prediction.start_value*decimal.Decimal(1 + autostop_percentage/100),2)
     #print(prediction.start_date.date() + timedelta(days=2))
     #print(datetime.now().date())
-    if prediction.start_date.date() + timedelta(days=2) <= datetime.now().date():
+    if start_date.date() + timedelta(days=2) <= datetime.now().date():
         #print('больше двух дней')
 
         #print(prediction.start_date + timedelta(hours=2))
@@ -308,29 +333,29 @@ async def prediction_candle_analys(prediction: Prediction, config: Config):
                                       config=config)).candles
 
         candles_lasthour = [x for x in candles_lasthour if x.time.replace(tzinfo=None) <= datetime.now()]
-        candles_lasthour = [x for x in candles_lasthour if x.time.replace(tzinfo=None) <= prediction.predicted_date]
+        candles_lasthour = [x for x in candles_lasthour if x.time.replace(tzinfo=None) <= predicted_date]
         candles_firsthour = (
-            await get_candles_inrange(figi=prediction.figi, from_=prediction.start_date + timedelta(hours=-1),
-                                      to=(prediction.start_date + timedelta(hours=1)).replace(minute=59, second=0),
+            await get_candles_inrange(figi=prediction.figi, from_=start_date + timedelta(hours=-1),
+                                      to=(start_date + timedelta(hours=1)).replace(minute=59, second=0),
                                       interval='minute',
                                       config=config)).candles
 
-        candles_firsthour = [x for x in candles_firsthour if x.time.replace(tzinfo=None) >= prediction.start_date]
+        candles_firsthour = [x for x in candles_firsthour if x.time.replace(tzinfo=None) >= start_date]
 
         candles_hourly = (
-            await get_candles_inrange(figi=prediction.figi, from_=prediction.start_date + timedelta(hours=1),
-                                      to=prediction.start_date + timedelta(days=2),
+            await get_candles_inrange(figi=prediction.figi, from_=start_date + timedelta(hours=1),
+                                      to=start_date + timedelta(days=2),
                                       interval='hour',
                                       config=config)).candles
 
         candles_dayly = (
             await get_candles_inrange(figi=prediction.figi,
-                                      from_=(prediction.start_date + timedelta(days=1)).replace(hour=23),
+                                      from_=(start_date + timedelta(days=1)).replace(hour=23),
                                       to=datetime.now(),
                                       interval='day',
                                       config=config)).candles
 
-        candles_dayly = [x for x in candles_dayly if x.time.replace(tzinfo=None) <= prediction.predicted_date]
+        candles_dayly = [x for x in candles_dayly if x.time.replace(tzinfo=None) <= predicted_date]
 
         all_candles = candles_firsthour + candles_hourly + candles_dayly + candles_lasthour
         if not all_candles:
@@ -340,20 +365,20 @@ async def prediction_candle_analys(prediction: Prediction, config: Config):
         if isLong > 0:
             bestcandle = max(all_candles, key=lambda item: item.h)
             worstcandle = min(all_candles, key=lambda item: item.l)
-            candles_morethen_predicted = [x for x in all_candles if x.h >= prediction.predicted_value]
+            candles_morethen_predicted = [x for x in all_candles if x.h >= predicted_value]
             # candles_lessthen_autostop = [x for x in all_candles if x.l <= autostop_value]
             try:
-                candles_lessthen_stop = [x for x in all_candles if x.l <= prediction.stop_value]
+                candles_lessthen_stop = [x for x in all_candles if x.l <= stop_value]
             except TypeError:
                 candles_lessthen_stop = []
             #print(f'maxof_candles.h: {bestcandle.h}')
         else:
             bestcandle = min(all_candles, key=lambda item: item.l)
             worstcandle = max(all_candles, key=lambda item: item.h)
-            candles_morethen_predicted = [x for x in all_candles if x.l <= prediction.predicted_value]
+            candles_morethen_predicted = [x for x in all_candles if x.l <= predicted_value]
             # candles_lessthen_autostop = [x for x in all_candles if x.h >= autostop_value]
             try:
-                candles_lessthen_stop = [x for x in all_candles if x.h >= prediction.stop_value]
+                candles_lessthen_stop = [x for x in all_candles if x.h >= stop_value]
             except:
                 candles_lessthen_stop = []
             #print(f'minof_candles_daily.h: {bestcandle.l}')
@@ -378,17 +403,17 @@ async def prediction_candle_analys(prediction: Prediction, config: Config):
         #pprint.pprint(f'первая свеча в которых предикт сбылся за всё время : {first_candle_morethen_predicted}')
 
         if isLong > 0:
-            current_difference = prediction.predicted_value - bestcandle.h
+            current_difference = predicted_value - bestcandle.h
             # current_autostop_difference = autostop_value - worstcandle.l
             try:
-                current_stop_difference = prediction.stop_value - worstcandle.l
+                current_stop_difference = stop_value - worstcandle.l
             except TypeError:
                 current_stop_difference = -1
         else:
-            current_difference = prediction.predicted_value - bestcandle.l
+            current_difference = predicted_value - bestcandle.l
             # current_autostop_difference = autostop_value - worstcandle.h
             try:
-                current_stop_difference = prediction.stop_value - worstcandle.h
+                current_stop_difference = stop_value - worstcandle.h
             except:
                 current_stop_difference = 1
 
@@ -409,7 +434,7 @@ async def prediction_candle_analys(prediction: Prediction, config: Config):
         return predictionAnalys
 
 
-    elif prediction.start_date + timedelta(hours=2) <= datetime.utcnow():
+    elif start_date + timedelta(hours=2) <= datetime.utcnow():
         #print(f'от двух часов')
         #print(prediction.start_date + timedelta(hours=2))
         #print(datetime.utcnow())
@@ -417,12 +442,12 @@ async def prediction_candle_analys(prediction: Prediction, config: Config):
         # print(to_time)
         #print(isLong)
         candles_firsthour = (
-            await get_candles_inrange(figi=prediction.figi, from_=prediction.start_date + timedelta(hours=-1),
-                                      to=(prediction.start_date + timedelta(hours=1)).replace(minute=59, second=0),
+            await get_candles_inrange(figi=prediction.figi, from_=start_date + timedelta(hours=-1),
+                                      to=(start_date + timedelta(hours=1)).replace(minute=59, second=0),
                                       interval='minute',
                                       config=config)).candles
 
-        candles_firsthour = [x for x in candles_firsthour if x.time.replace(tzinfo=None) >= prediction.start_date]
+        candles_firsthour = [x for x in candles_firsthour if x.time.replace(tzinfo=None) >= start_date]
 
         candles_lasthour = (
             await get_candles_inrange(figi=prediction.figi, from_=datetime.utcnow() + timedelta(hours=-2),
@@ -431,16 +456,16 @@ async def prediction_candle_analys(prediction: Prediction, config: Config):
                                       config=config)).candles
 
         candles_lasthour = [x for x in candles_lasthour if x.time.replace(tzinfo=None) <= datetime.now()]
-        candles_lasthour = [x for x in candles_lasthour if x.time.replace(tzinfo=None) <= prediction.predicted_date]
+        candles_lasthour = [x for x in candles_lasthour if x.time.replace(tzinfo=None) <= predicted_date]
 
 
         candles_hourly = (
-            await get_candles_inrange(figi=prediction.figi, from_=prediction.start_date, to=datetime.utcnow(),
+            await get_candles_inrange(figi=prediction.figi, from_=start_date, to=datetime.utcnow(),
                                       interval='hour',
                                       config=config)).candles
         #print(f'почасовые№№№№№№№№№№№№№№№№№№№№№№№№№№№№№№№№№№№№№№№№№№№№№№№№№')
 
-        candles_hourly = [x for x in candles_hourly if x.time.replace(tzinfo=None) <= prediction.predicted_date]
+        candles_hourly = [x for x in candles_hourly if x.time.replace(tzinfo=None) <= predicted_date]
 
         all_candles = candles_firsthour + candles_hourly + candles_lasthour
         if not all_candles:
@@ -450,20 +475,20 @@ async def prediction_candle_analys(prediction: Prediction, config: Config):
         if isLong > 0:
             bestcandle = max(all_candles, key=lambda item: item.h)
             worstcandle = min(all_candles, key=lambda item: item.l)
-            candles_morethen_predicted = [x for x in all_candles if x.h >= prediction.predicted_value]
+            candles_morethen_predicted = [x for x in all_candles if x.h >= predicted_value]
             # candles_lessthen_autostop = [x for x in all_candles if x.l <= autostop_value]
             try:
-                candles_lessthen_stop = [x for x in all_candles if x.l <= prediction.stop_value]
+                candles_lessthen_stop = [x for x in all_candles if x.l <= stop_value]
             except TypeError:
                 candles_lessthen_stop = []
             #print(f'maxof_candles.h: {bestcandle.h}')
         else:
             bestcandle = min(all_candles, key=lambda item: item.l)
             worstcandle = max(all_candles, key=lambda item: item.h)
-            candles_morethen_predicted = [x for x in all_candles if x.l <= prediction.predicted_value]
+            candles_morethen_predicted = [x for x in all_candles if x.l <= predicted_value]
             # candles_lessthen_autostop = [x for x in all_candles if x.h >= autostop_value]
             try:
-                candles_lessthen_stop = [x for x in all_candles if x.h >= prediction.stop_value]
+                candles_lessthen_stop = [x for x in all_candles if x.h >= stop_value]
             except:
                 candles_lessthen_stop = []
             #print(f'minof_candles_daily.h: {bestcandle.l}')
@@ -487,17 +512,17 @@ async def prediction_candle_analys(prediction: Prediction, config: Config):
         #     first_candle_lessthen_autostop = worstcandle
 
         if isLong > 0:
-            current_difference = prediction.predicted_value - bestcandle.h
+            current_difference = predicted_value - bestcandle.h
             # current_autostop_difference = autostop_value - worstcandle.l
             try:
-                current_stop_difference = prediction.stop_value - worstcandle.l
+                current_stop_difference = stop_value - worstcandle.l
             except TypeError:
                 current_stop_difference = -1
         else:
-            current_difference = prediction.predicted_value - bestcandle.l
+            current_difference = predicted_value - bestcandle.l
             # current_autostop_difference = autostop_value - worstcandle.h
             try:
-                current_stop_difference = prediction.stop_value - worstcandle.h
+                current_stop_difference = stop_value - worstcandle.h
             except:
                 current_stop_difference = 1
 
@@ -519,11 +544,11 @@ async def prediction_candle_analys(prediction: Prediction, config: Config):
 
     else:
         #print('меньше двух часов')
-        to_time = (prediction.start_date + timedelta(hours=1)).replace(minute=59, second=0)
+        to_time = (start_date + timedelta(hours=1)).replace(minute=59, second=0)
         #print(to_time)
         #print(isLong)
         candles_firsthour = (
-            await get_candles_inrange(figi=prediction.figi, from_=prediction.start_date + timedelta(hours=-2),
+            await get_candles_inrange(figi=prediction.figi, from_=start_date + timedelta(hours=-2),
                                       to=datetime.utcnow(), interval='minute',
                                       config=config)).candles
         # if not candles_firsthour:
@@ -532,8 +557,8 @@ async def prediction_candle_analys(prediction: Prediction, config: Config):
 
         #print(f'dfgkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkk')
 
-        candles_firsthour = [x for x in candles_firsthour if x.time.replace(tzinfo=None) >= prediction.start_date]
-        candles_firsthour = [x for x in candles_firsthour if x.time.replace(tzinfo=None) <= prediction.predicted_date]
+        candles_firsthour = [x for x in candles_firsthour if x.time.replace(tzinfo=None) >= start_date]
+        candles_firsthour = [x for x in candles_firsthour if x.time.replace(tzinfo=None) <= predicted_date]
 
         all_candles = candles_firsthour
 
@@ -544,20 +569,20 @@ async def prediction_candle_analys(prediction: Prediction, config: Config):
         if isLong > 0:
             bestcandle = max(all_candles, key=lambda item: item.h)
             worstcandle = min(all_candles, key=lambda item: item.l)
-            candles_morethen_predicted = [x for x in all_candles if x.h >= prediction.predicted_value]
+            candles_morethen_predicted = [x for x in all_candles if x.h >= predicted_value]
             # candles_lessthen_autostop = [x for x in all_candles if x.l <= autostop_value]
             try:
-                candles_lessthen_stop = [x for x in all_candles if x.l <= prediction.stop_value]
+                candles_lessthen_stop = [x for x in all_candles if x.l <= stop_value]
             except TypeError:
                 candles_lessthen_stop = []
             #print(f'maxof_candles.h: {bestcandle.h}')
         else:
             bestcandle = min(all_candles, key=lambda item: item.l)
             worstcandle = max(all_candles, key=lambda item: item.h)
-            candles_morethen_predicted = [x for x in all_candles if x.l <= prediction.predicted_value]
+            candles_morethen_predicted = [x for x in all_candles if x.l <= predicted_value]
             # candles_lessthen_autostop = [x for x in all_candles if x.h >= autostop_value]
             try:
-                candles_lessthen_stop = [x for x in all_candles if x.h >= prediction.stop_value]
+                candles_lessthen_stop = [x for x in all_candles if x.h >= stop_value]
             except:
                 candles_lessthen_stop = []
             #print(f'minof_candles_daily.h: {bestcandle.l}')
@@ -581,17 +606,17 @@ async def prediction_candle_analys(prediction: Prediction, config: Config):
         #     first_candle_lessthen_autostop = worstcandle
 
         if isLong > 0:
-            current_difference = prediction.predicted_value - bestcandle.h
+            current_difference = predicted_value - bestcandle.h
             # current_autostop_difference = autostop_value - worstcandle.l
             try:
-                current_stop_difference = prediction.stop_value - worstcandle.l
+                current_stop_difference = stop_value - worstcandle.l
             except TypeError:
                 current_stop_difference = -1
         else:
-            current_difference = prediction.predicted_value - bestcandle.l
+            current_difference = predicted_value - bestcandle.l
             # current_autostop_difference = autostop_value - worstcandle.h
             try:
-                current_stop_difference = prediction.stop_value - worstcandle.h
+                current_stop_difference = stop_value - worstcandle.h
             except:
                 current_stop_difference = 1
 
@@ -616,6 +641,6 @@ async def calculate_rating_job():
     await predictions_active()
     await predictions_active_finished()
 
-#
+# #
 # asyncio.run(predictions_active())
 # asyncio.run(predictions_active_finished())

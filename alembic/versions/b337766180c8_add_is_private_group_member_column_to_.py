@@ -1,9 +1,7 @@
 """add is_private_group_member column to users
-
 Revision ID: b337766180c8
 Revises: 908d2ae759ec
 Create Date: 2022-02-07 01:47:27.172092
-
 """
 from alembic import op
 import sqlalchemy as sa
