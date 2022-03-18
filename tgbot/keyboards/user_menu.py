@@ -5,7 +5,7 @@ from tgbot.keyboards.callback_datas import user_callback
 
 def main_menu_keyboard():
     keyboard = [[InlineKeyboardButton('💸 Управление Подпиской', callback_data=user_callback.new(action='sub'))],
-                [InlineKeyboardButton('🚀 Получить ссылку на канал', callback_data=user_callback.new(action='link'))],
+                [InlineKeyboardButton('🚀 Получить доступ к ресурсам', callback_data=user_callback.new(action='link'))],
                 [InlineKeyboardButton('📈 Информация о прогнозах', callback_data=user_callback.new(action='pred'))],
                 [InlineKeyboardButton('👨‍🏫 Информация об аналитиках', callback_data=user_callback.new(action='analytic'))],
                 [InlineKeyboardButton('👨‍💻 Информация о пользователе', callback_data=user_callback.new(action='myinfo'))]]
@@ -21,6 +21,12 @@ def main_menu_keyboard_test():
 def first_menu_keyboard():
     keyboard = [[InlineKeyboardButton('📅 Информация о подписке', callback_data=user_callback.new(action='sub_info'))],
                 [InlineKeyboardButton('💳 Оформить\Продлить подписку', callback_data=user_callback.new(action='sub_approve'))],
+                [InlineKeyboardButton('Главное меню', callback_data=user_callback.new(action='main'))]]
+    return InlineKeyboardMarkup(inline_keyboard=keyboard)
+
+def link_menu_keyboard():
+    keyboard = [[InlineKeyboardButton('🚀 Получить ссылку на канал SosisochniePrognozi', callback_data=user_callback.new(action='link_channel'))],
+                [InlineKeyboardButton('🧾 Получить ссылку на приватный чат SosisochniePrognozi', callback_data=user_callback.new(action='link_chat'))],
                 [InlineKeyboardButton('Главное меню', callback_data=user_callback.new(action='main'))]]
     return InlineKeyboardMarkup(inline_keyboard=keyboard)
 
@@ -43,6 +49,9 @@ def main_menu_message():
 
 def first_menu_message():
     return 'Здесь вы можете управлять своей подпиской на канал:'
+
+def link_menu_message():
+    return 'Здесь вы можете получить доступ к доступным ресурсам:'
 
 
 def second_menu_message():

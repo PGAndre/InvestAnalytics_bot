@@ -33,6 +33,7 @@ class TgBot:
     channel_id: int
     group_id: int
     flood_channel_id: int
+    private_group_id: int
 
 
 @dataclass
@@ -68,7 +69,8 @@ def load_config(path: str = None):
             use_redis=env.bool("USE_REDIS"),
             channel_id=env.int("CHANNEL_ID"),
             group_id=env.int("GROUP_ID"),
-            flood_channel_id=env.int("FLOOD_CHANNEL_ID")
+            flood_channel_id=env.int("FLOOD_CHANNEL_ID"),
+            private_group_id=env.int("PRIVATE_GROUP_ID")
         ),
         db=DbConfig(
             host=env.str('DB_HOST'),

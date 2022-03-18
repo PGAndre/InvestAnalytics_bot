@@ -20,3 +20,8 @@ async def group_chat_member(chat_member):
     config = chat_member.bot.get('config')
     filter =  chat_member.chat.id == config.tg_bot.group_id
     return filter
+
+async def private_group_member_filter(chat_member):
+    config = chat_member.bot.get('config')
+    filter =  chat_member.chat.id == config.tg_bot.private_group_id
+    return filter
