@@ -36,20 +36,22 @@ async def chat_member_update(chat_member: ChatMemberUpdated):
 
 
         # запущен ли бот в бесплатном режиме.
-    free = config.test.free
-    if free:
-        subscription_until_str = config.test.free_subtime
-    else:
-        subscription_until_str = config.test.prod_subtime
+    # free = config.test.free
+    # if free:
+    #     subscription_until_str = config.test.free_subtime
+    # else:
+    #     subscription_until_str = config.test.prod_subtime
+    #
+    #
+    # subscription_until = datetime.strptime(subscription_until_str, '%d/%m/%y %H:%M:%S')
 
-
-    subscription_until = datetime.strptime(subscription_until_str, '%d/%m/%y %H:%M:%S')
 
 
     if status == 'member' or status == 'creator':
         user: User = await User.get_user(db_session=db_session,
                                          telegram_id=user_id)
         if not user:
+            subscription_until = datetime.utcnow() + timedelta(days=7)
             new_user: User = await User.add_user(db_session=db_session,
                                                  subscription_until=subscription_until,
                                                  telegram_id=user_id,
