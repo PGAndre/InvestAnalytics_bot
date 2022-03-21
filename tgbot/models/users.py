@@ -23,6 +23,7 @@ class User(Base):
     updated_date = Column(DateTime, onupdate=func.now())
     is_member = Column(Boolean, default=True)
     is_botuser = Column(Boolean, default=False)
+    is_private_group_member = Column(Boolean, default=False)
 
     @classmethod
     async def get_user(cls, db_session: sessionmaker, telegram_id: int) -> 'User':
@@ -39,6 +40,16 @@ class User(Base):
                             is_member: bool) -> 'list[User]':
         async with db_session() as db_session:
             sql = select(cls).where(cls.role == 'user').where(cls.is_member == is_member).where(cls.subscription_until < time)
+            request = await db_session.execute(sql)
+            users: list[cls] = request.scalars()
+        return users
+
+    @classmethod
+    async def get_private_group_users_sub(cls, db_session: sessionmaker,
+                            time: datetime,
+                            is_private_group_member: bool) -> 'list[User]':
+        async with db_session() as db_session:
+            sql = select(cls).where(cls.role == 'user').where(cls.is_private_group_member == is_private_group_member).where(cls.subscription_until < time)
             request = await db_session.execute(sql)
             users: list[cls] = request.scalars()
         return users

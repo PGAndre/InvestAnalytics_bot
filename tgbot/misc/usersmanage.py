@@ -11,6 +11,31 @@ from tgbot.models.users import User
 from tgbot.services.database import create_db_session
 
 
+async def kick_private_group_users():
+    config: Config = load_config()
+    db_session = await create_db_session(config)
+    users = await User.get_private_group_users_sub(db_session=db_session, time=datetime.now(), is_private_group_member=True)
+    bot = Bot(token=config.tg_bot.token, parse_mode='HTML')
+    channel_id = config.tg_bot.channel_id
+    private_group_id = config.tg_bot.private_group_id
+    botobj = await bot.get_me()
+    botname = botobj.username
+    logger = logging.getLogger(__name__)
+
+    for user in users:
+        await asyncio.sleep(0.05)
+        user_id = user.telegram_id
+        try:
+            await bot.unban_chat_member(chat_id=private_group_id, user_id=user_id)
+            # await bot.kick_chat_member(chat_id=channel_id, user_id=user_id, until_date=timedelta(seconds=60))
+            # logger.info(f'пользователь {user.__dict__} был исключен из канала в связи с тем, что не был занесен в базу')
+        except:
+            logger.info(
+                f'нельзя кикнуть пользователя {user.__dict__}{botobj}')
+        # await bot.unban_chat_member(chat_id=channel_id, user_id=user_id)
+        # await bot.kick_chat_member(chat_id=channel_id, user_id=user_id, until_date=timedelta(seconds=60))
+        logger.info(f'пользователь {user.__dict__} был исключен из приватной группы в связи с истекшей подпиской')
+
 # запускать каждый день!
 async def kick_users():
     config: Config = load_config()
@@ -18,6 +43,7 @@ async def kick_users():
     users = await User.get_users_sub(db_session=db_session, time=datetime.now(), is_member=True)
     bot = Bot(token=config.tg_bot.token, parse_mode='HTML')
     channel_id = config.tg_bot.channel_id
+    private_group_id = config.tg_bot.private_group_id
     botobj = await bot.get_me()
     botname = botobj.username
     logger = logging.getLogger(__name__)
@@ -35,6 +61,7 @@ async def kick_users():
         # await bot.unban_chat_member(chat_id=channel_id, user_id=user_id)
         # await bot.kick_chat_member(chat_id=channel_id, user_id=user_id, until_date=timedelta(seconds=60))
         logger.info(f'пользователь {user.__dict__} был исключен из канала в связи с истекшей подпиской')
+
         if user.is_botuser:
             try:
                 await bot.send_message(chat_id=user_id,
@@ -130,7 +157,9 @@ async def notify_users_with_inactive_sub():
 #     bot = Bot(token=config.tg_bot.token, parse_mode='HTML')
 #     await bot.
 
-# asyncio.run(kick_users_notmember())
+
+#asyncio.run(kick_users_notmember())
 # asyncio.run(notify_users_with_active_sub())
 # asyncio.run(notify_users_with_inactive_sub())
 # asyncio.run(kick_users())
+# asyncio.run(kick_private_group_users())
