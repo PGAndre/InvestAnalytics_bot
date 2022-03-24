@@ -40,6 +40,14 @@ class Analytic(Base):
             analytic: cls = request.scalars()
             return analytic
 
+    @classmethod
+    async def get_all_analytics(cls, db_session:sessionmaker):
+        async with db_session() as db_session:
+            sql = select(cls)
+            request = await db_session.execute(sql)
+            analytic: cls = request.scalars()
+            return analytic
+
 
     @classmethod
     async def add_analytic(cls,
@@ -189,6 +197,19 @@ class Prediction(Base):
         async with db_session() as db_session:
             sql = select(cls).where(cls.is_active == true()).where(cls.analytic_id == analytic_id).join(Analytic,
                                                                                        Analytic.telegram_id == cls.analytic_id)
+            request = await db_session.execute(sql)
+            predict: cls = request.scalars()
+            return predict
+
+    @classmethod
+
+    async def get_finished_predicts_by_analytic_lastdays(cls,
+                          db_session: sessionmaker,
+                          analytic_id: BigInteger,
+                          start_date: datetime) -> 'Prediction':
+        async with db_session() as db_session:
+            sql = select(cls).where(cls.is_active != true()).where(cls.analytic_id == analytic_id).where(cls.start_date >= start_date).join(Analytic,
+                                                                                       Analytic.telegram_id == cls.analytic_id).join(Prediction_averaging, Prediction_averaging.prediction_id == cls.id, isouter=True)
             request = await db_session.execute(sql)
             predict: cls = request.scalars()
             return predict
