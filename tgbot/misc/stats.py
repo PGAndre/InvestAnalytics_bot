@@ -5,7 +5,8 @@ from datetime import timedelta, datetime
 from aiogram import Bot
 from sqlalchemy.orm import sessionmaker
 
-from tgbot.models.analytic import Prediction, Analytic
+from tgbot.models.analytic import Prediction, Analytic, Prediction_averaging
+
 
 # class Profit_stat():
 #     def __init__(self,
@@ -31,17 +32,25 @@ from tgbot.models.analytic import Prediction, Analytic
 
 async def calculate_profit_stat(db_session: sessionmaker):
     db_session = db_session
+    await profit_analytics(db_session, 10)
     await profit_analytics(db_session, 30)
+    await profit_analytics(db_session, 50)
+    # await profit_analytics(db_session, 9999)
     await profit_analytics(db_session, 90)
-    await profit_analytics(db_session, 9999)
+
+
+
+
 
     await profit_all(db_session)
 
 async def profit_analytics(db_session: sessionmaker, days: int) -> int:
     analytics = await Analytic.get_all_analytics(db_session=db_session)
     deposit_start_all = 1
+    all_count = 0
     deposit_end_all = deposit_start_all
     for analytic in analytics:
+        print(f'Аналитик: {analytic.Nickname}----------------{days} days')
         ### прогнозы за последние 30 дней:
         start_date = datetime.utcnow() + timedelta(days=-days)
         predicts = await Prediction.get_finished_predicts_by_analytic_lastdays(db_session=db_session,
@@ -50,30 +59,53 @@ async def profit_analytics(db_session: sessionmaker, days: int) -> int:
         deposit_start_analytic = deposit_start_all
         deposit_end_analytic = deposit_start_analytic
         predict_deposit_koef = 0.05
-
+        count_by_analytic = 0
         for predict in predicts:
+            ticker = predict.ticker
             predicted_value = float(predict.predicted_value)
             start_value = float(predict.start_value)
             end_value = float(predict.end_value)
-            print(predict.__dict__)
             predict_sign = (math.copysign(1, (predicted_value - start_value)))
-            profit = deposit_start_analytic*predict_deposit_koef*(end_value/start_value -1)*predict_sign
-            deposit_end_analytic = deposit_start_analytic + profit
+            predict_averaging = await Prediction_averaging.get_averaging_by_predict(db_session=db_session, prediction_id=predict.id)
+
+            predict_averagings = []
+            if predict_averaging is None:
+                profit = deposit_start_analytic * predict_deposit_koef * (end_value / start_value - 1) * predict_sign
+                deposit_end_analytic += profit
+                count_by_analytic += 1
+                pass
+            else:
+                # for predict_averaging in predict_averaging_raw:
+                #     predict_averagings.append(predict_averaging)
+                # print(predict_averaging)
+                profit_before_averaging = deposit_start_analytic * predict_deposit_koef * (float(predict_averaging.start_value) / start_value - 1) * predict_sign
+                profit_after_averaging = deposit_start_analytic * predict_deposit_koef * 2 * (end_value / float(predict_averaging.start_value) - 1) * predict_sign
+                profit = profit_after_averaging + profit_before_averaging
+                deposit_end_analytic += profit
+                count_by_analytic += 1
+                pass
+
+
+
+
 
         analytic_profit = deposit_end_analytic-deposit_start_analytic
         analytic_profit_percentage = (deposit_end_analytic-deposit_start_analytic)/deposit_start_analytic
         deposit_end_all += analytic_profit
-        all_profit_percentage = (deposit_start_all - deposit_end_all)/deposit_start_all
-        print(f'профит за {days} дней:------------------')
-        print(f'Аналитик: {analytic.Nickname}')
-        print(f'Конечный депозит по аналитику: {deposit_end_analytic}')
-        print(f'Профит от Аналитика: {analytic_profit}')
-        print(f'Процент профита: {analytic_profit_percentage}')
-    print(f'Конечный депозит по всем аналитикам: {deposit_end_all}')
-    print(f'Конечный процент профита по всем аналитикам: {all_profit_percentage}')
+        all_count += count_by_analytic
+        all_profit_percentage = (deposit_end_all - deposit_start_all)/deposit_start_all
+        # print(f'профит за {days} дней:------------------')
+        # print(f'Аналитик: {analytic.Nickname}')
+        # print(f'Конечный депозит по аналитику: {deposit_end_analytic}')
+        # print(f'Профит от Аналитика: {analytic_profit}')
+        print(f'Процент профита: {round(analytic_profit_percentage * 100, 2)}%')
+        print(f'Кол-во прогнозов по аналитику за {days} дней: {count_by_analytic}')
+    # print(f'Конечный депозит по всем аналитикам: {round(deposit_end_all, 2)}')
+    print(f'Конечный процент профита по всем аналитикам: {round(all_profit_percentage * 100, 2)}% за {days} дней')
+    print(f'Всего прогнозов за {days} дней: {all_count}')
 
-1) НЕ УЧТЕНО УСРЕДНЕНИЕ!!!
-2) ЗАПИСЬ в базу
+# 1) НЕ УЧТЕНО УСРЕДНЕНИЕ!!!
+# 2) ЗАПИСЬ в базу
 
 async def profit_all(db_session: sessionmaker):
     pass
