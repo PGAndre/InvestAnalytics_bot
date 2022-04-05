@@ -80,7 +80,7 @@ async def main():
     # scope = BotCommandScopeChat(chat_id=-1001317811501)
 
 
-    command = [BotCommand("menu", "открыть меню")]
+    command = [BotCommand("menu", "Открыть меню"),BotCommand("info", "Общая информация")]
     scope = BotCommandScopeAllPrivateChats(type=BotCommandScopeType.ALL_PRIVATE_CHATS) # именять команды только к приватным чатам
     await bot.delete_my_commands(scope=scope) #удаляем меню из ранее установленных чатов
     await bot.delete_my_commands() # удаляем меню изо всех других чатов, куда он прилетал.
