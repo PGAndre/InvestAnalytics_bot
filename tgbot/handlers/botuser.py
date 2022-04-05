@@ -597,18 +597,36 @@ async def get_chat_invitelink(query: CallbackQuery):
         await query.message.answer(f"Здравствуйте! \nВаша ссылка для входа в приватный чат: {invite_link.invite_link}")
 
 
-async def user_help(message: Message):
+async def user_info(message: Message):
     user: User = await user_add_or_update(message, role='user', module=__name__)
     await message.answer(
-            f'''Общая информация !          
+            f'''Добро пожаловать в Сосисочные ресурсы!
+
+Отсюда вы сможете попасть в канал с прогнозами, приватный чат для подписчиков, а так же получать актуальную информацию по текущим прогнозам, аналитикам и вашей подписке.
+
+Для начала работы нажмите /menu
+Если у вас возникнут вопросы в процессе пользования обратитесь к @sosisochniy_admin
+
+В канале прогнозов обязательно ознакомьтесь с информацией в закреплённом сообщении. У вас есть бесплатная тестовая неделя чтобы освоиться (отсчет начинается с первого входа в бота).
+
+Так же ждем вас в нашем бесплатном Сосисочном издании с самыми свежими новостями и обучающими статьями
+https://t.me/SosisochnayaGazeta    
    ''')
 
 async def user_start(message: Message):
     user: User = await user_add_or_update(message, role='user', module=__name__)
     await message.answer(
-            f'''Здравствуйте!
-/menu - чтобы попасть в основное меню
-/help - Информация.
+            f'''Добро пожаловать в Сосисочные ресурсы!
+
+Отсюда вы сможете попасть в канал с прогнозами, приватный чат для подписчиков, а так же получать актуальную информацию по текущим прогнозам, аналитикам и вашей подписке.
+
+Для начала работы нажмите /menu
+Если у вас возникнут вопросы в процессе пользования обратитесь к @sosisochniy_admin
+
+В канале прогнозов обязательно ознакомьтесь с информацией в закреплённом сообщении. У вас есть бесплатная тестовая неделя чтобы освоиться (отсчет начинается с первого входа в бота).
+
+Так же ждем вас в нашем бесплатном Сосисочном издании с самыми свежими новостями и обучающими статьями
+https://t.me/SosisochnayaGazeta
 ''')
 
 
@@ -734,5 +752,5 @@ def register_botuser(dp: Dispatcher):
 
     dp.register_my_chat_member_handler(my_chat_member_update)
     dp.register_message_handler(user_start, commands=["start"], state="*", chat_type="private")
-    dp.register_message_handler(user_help, commands=["help"], state="*", chat_type="private")
+    dp.register_message_handler(user_info, commands=["info"], state="*", chat_type="private")
     dp.register_message_handler(process_success_payment, content_types = ContentType.SUCCESSFUL_PAYMENT)
