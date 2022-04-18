@@ -91,10 +91,13 @@ async def predictions_active():
             else:  # если не сбылся - записываем лучшее значение
                 # записываем изначальную дату прогноза.
                 end_date = prediction.predicted_date
-
-                end_value = await tinkoff.get_latest_cost_history(figi=prediction.figi,
+                try:
+                    end_value = await tinkoff.get_latest_cost_history(figi=prediction.figi,
                                                                   config=config,
                                                                   to_time=prediction.predicted_date)
+                except:
+                    end_value = await tinkoff.latestcost(figi=prediction.figi, config=config)
+
                 # if isLong > 0:
                 #     end_value = predictionanalysis.best_candle.h
                 # else:
