@@ -1,12 +1,16 @@
 import asyncio
+import logging
 from contextlib import suppress
 import datetime
 
+from aiogram import Bot
 from sqlalchemy import Column, BigInteger, insert, String, ForeignKey, update, func, Boolean, DateTime, MetaData
 from sqlalchemy import select
 from sqlalchemy.orm import sessionmaker, relationship
 
 from tgbot.config import load_config
+from tgbot.keyboards.user_menu import first_menu_keyboard
+from tgbot.models.admin import Message
 from tgbot.services.database import create_db_session
 from tgbot.services.db_base import Base
 
@@ -93,6 +97,46 @@ class User(Base):
             result = await db_session.execute(sql)
             await db_session.commit()
             return result.first()
+
+
+    @classmethod
+    async def get_users_by_query(cls,
+                                 db_session: sessionmaker,
+                                 query: str) -> 'list[User]':
+        async with db_session() as db_session:
+            if query == "all_botusers":
+                sql = select(cls).where(cls.role == 'user').where(cls.is_botuser == True).where(cls.role == 'user')
+                request = await db_session.execute(sql)
+            users: list[cls] = request.scalars()
+        return users
+
+
+    @classmethod
+    async def send_messages_to_userslist(cls,
+                                         users: 'list[User]',
+                                         message: Message,
+                                         bot: Bot,
+                                         module: str):
+        botobj = await bot.get_me()
+        config = bot['config']
+        db_session = bot.get("db")
+        logger = logging.getLogger(module)
+        await message.update_message(db_session, last_sent_date=datetime.datetime.utcnow())
+        for user in users:
+            await asyncio.sleep(0.05)
+            try:
+                await bot.send_message(chat_id=user.telegram_id,
+                                       text=message.message,
+                                       reply_markup=first_menu_keyboard())
+                logger.info(f'Сообщение с ID {message.id} ,было послано пользователю {user.__dict__}')
+            except:
+                await user.update_user(db_session=db_session,
+                                       is_botuser=False)
+                logger.exception(
+                    f'нельзя отправить сообщение пользователю {user.__dict__}, т.к он отключил бота {botobj}')
+
+
+
 
 
 if __name__ == '__main__':
