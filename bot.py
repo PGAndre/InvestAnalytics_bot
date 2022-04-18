@@ -23,7 +23,7 @@ from tgbot.handlers.user import register_user
 from tgbot.middlewares.db import DbMiddleware
 from tgbot.misc.rating import calculate_rating_job
 from tgbot.misc.usersmanage import kick_users, notify_users_with_active_sub, notify_users_with_inactive_sub, \
-    kick_users_notmember, kick_private_group_users, notify_users_with_active_sub_notmembers
+    kick_users_notmember, kick_private_group_users, notify_users_with_active_sub_notmembers, bot_messaging
 from tgbot.services.database import create_db_session
 
 logger = logging.getLogger(__name__)
@@ -95,6 +95,7 @@ async def main():
         CronTrigger(hour='0-23', minute='*'),
     ])
     scheduler.add_job(calculate_rating_job, trigger)
+    scheduler.add_job(bot_messaging, trigger, args=[bot])
     # scheduler.add_job(calculate_rating_job, "cron", hour='7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23')
     scheduler.add_job(kick_users, "cron", hour='21')
     scheduler.add_job(kick_private_group_users, "cron", hour='22')

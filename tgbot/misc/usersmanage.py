@@ -4,9 +4,11 @@ from datetime import datetime, timedelta
 
 from aiogram import Bot
 from aiogram.utils.exceptions import BotBlocked
+from sqlalchemy.orm import sessionmaker
 
 from tgbot.config import load_config, Config
 from tgbot.keyboards.user_menu import first_menu_keyboard
+from tgbot.models.admin import Message
 from tgbot.models.users import User
 from tgbot.services.database import create_db_session
 
@@ -179,6 +181,25 @@ async def notify_users_with_inactive_sub():
                                        is_botuser=False)
                 logger.exception(
                     f'нельзя отправить сообщение пользователю {user.__dict__}, т.к он отключил бота {botobj}')
+
+
+
+async def bot_messaging(bot: Bot):
+    messages = await Message.get_active_messages(db_session=bot.get("db"))
+    for message in messages:
+        message_datetime = datetime.combine(message.message_date, message.message_time)
+        if datetime.utcnow() >= message.start_date and datetime.utcnow() <= message.end_date:
+            if message.type == 'once':
+                if datetime.utcnow() >= message_datetime and message.last_sent_date is None:
+                    users = await User.get_users_by_query(db_session=bot.get("db"), query=message.recipients_query)
+                    await User.send_messages_to_userslist(users=users, message=message, bot=bot, module=__name__)
+
+
+
+
+
+
+
 
 
 # async def add_user_tochannel():
