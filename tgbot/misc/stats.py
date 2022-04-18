@@ -35,8 +35,11 @@ async def calculate_profit_stat(db_session: sessionmaker):
     await profit_analytics(db_session, 10)
     await profit_analytics(db_session, 30)
     await profit_analytics(db_session, 50)
+    await profit_analytics(db_session, 60)
     # await profit_analytics(db_session, 9999)
     await profit_analytics(db_session, 90)
+    await profit_analytics(db_session, 120)
+    await profit_analytics(db_session, 9999)
 
 
 
