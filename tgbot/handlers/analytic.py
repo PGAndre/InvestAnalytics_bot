@@ -1260,6 +1260,15 @@ async def set_target_averaging(message: Message, state: FSMContext):
     async with state.proxy() as data:
         data['target'] = target
 
+        # Redis blocking commands block the connection they are on
+        # until they complete. For this reason, the connection must
+        # not be returned to the connection pool until we've
+        # finished waiting on future created by brpop(). To achieve
+        # this, 'await redis' acquires a dedicated connection from
+        # the connection pool and creates a new Redis command object
+        # using it. This object is a context manager and the
+        # connection will be released back to the pool at the end of
+        # the with block."
     nums_after_point = await num_after_point(start_value)
     if predict_sign==-1:
         min_stop = round(latestcost*(1+1.5/100), nums_after_point)

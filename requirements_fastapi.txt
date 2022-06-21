@@ -1,0 +1,11 @@
+environs~=8.0.0
+SQLAlchemy~=1.4.18
+asyncpg
+alembic
+numpy
+pandas-market-calendars
+aiogram~=2.15
+psycopg2-binary
+uvicorn
+fastapi
+redis
