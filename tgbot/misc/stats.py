@@ -32,7 +32,13 @@ from tgbot.models.analytic import Prediction, Analytic, Prediction_averaging
 
 async def calculate_profit_stat(db_session: sessionmaker):
     db_session = db_session
+    await profit_analytics(db_session, 1)
+    await profit_analytics(db_session, 3)
+    await profit_analytics(db_session, 5)
     await profit_analytics(db_session, 10)
+    await profit_analytics(db_session, 15)
+    await profit_analytics(db_session, 20)
+    await profit_analytics(db_session, 25)
     await profit_analytics(db_session, 30)
     await profit_analytics(db_session, 50)
     await profit_analytics(db_session, 60)
